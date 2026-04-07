@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
-export default function SsoPage() {
+function SsoContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [error, setError] = useState('');
@@ -27,7 +27,6 @@ export default function SsoPage() {
       .then(r => r.json())
       .then(data => {
         if (data.ok) {
-          // 세션 쿠키는 API에서 설정됨 → 어드민 대시보드로 이동
           router.replace(`/admin/${data.slug}`);
         } else {
           setError(data.error || 'SSO 인증에 실패했습니다.');
@@ -69,4 +68,21 @@ export default function SsoPage() {
   }
 
   return null;
+}
+
+export default function SsoPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-gray-300 border-t-gray-900 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-500">인증 중입니다...</p>
+          </div>
+        </div>
+      }
+    >
+      <SsoContent />
+    </Suspense>
+  );
 }
