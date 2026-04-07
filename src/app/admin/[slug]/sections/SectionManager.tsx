@@ -6,11 +6,9 @@ import Link from 'next/link';
 interface Section {
   id: number;
   sectionKey: string;
-  title: string;
-  subtitle: string;
   sortOrder: number;
   isActive: boolean;
-  settings: Record<string, string>;
+  settings: Record<string, unknown>;
 }
 
 const AVAILABLE_SECTIONS = [
@@ -38,8 +36,8 @@ export default function SectionManager({ slug }: { slug: string }) {
     try {
       const res = await fetch(`/api/admin/sections?slug=${slug}`);
       if (!res.ok) throw new Error('불러오기 실패');
-      const data = await res.json();
-      setSections(data.sections ?? []);
+      const json = await res.json();
+      setSections(json.data ?? []);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '오류 발생');
     } finally {
@@ -47,18 +45,16 @@ export default function SectionManager({ slug }: { slug: string }) {
     }
   }, [slug]);
 
-  useEffect(() => {
-    fetchSections();
-  }, [fetchSections]);
+  useEffect(() => { fetchSections(); }, [fetchSections]);
 
-  async function handleToggle(id: number, isActive: boolean) {
+  async function handleToggle(id: number, currentActive: boolean) {
     try {
       await fetch('/api/admin/sections', {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, siteSlug: slug, isActive: !isActive }),
+        body: JSON.stringify({ id, slug, isActive: !currentActive }),
       });
-      setSections(prev => prev.map(s => s.id === id ? { ...s, isActive: !isActive } : s));
+      setSections(prev => prev.map(s => s.id === id ? { ...s, isActive: !currentActive } : s));
     } catch { /* silent */ }
   }
 
@@ -68,35 +64,48 @@ export default function SectionManager({ slug }: { slug: string }) {
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
     if (swapIdx < 0 || swapIdx >= sections.length) return;
 
+    const a = sections[idx];
+    const b = sections[swapIdx];
     const reordered = [...sections];
     [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
     setSections(reordered);
 
     try {
-      await fetch('/api/admin/sections', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ siteSlug: slug, orderedIds: reordered.map(s => s.id) }),
-      });
+      await Promise.all([
+        fetch('/api/admin/sections', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: a.id, slug, sortOrder: b.sortOrder }),
+        }),
+        fetch('/api/admin/sections', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: b.id, slug, sortOrder: a.sortOrder }),
+        }),
+      ]);
     } catch { /* silent */ }
   }
 
   function startEdit(section: Section) {
     setEditingId(section.id);
-    setEditTitle(section.title);
-    setEditSubtitle(section.subtitle);
+    setEditTitle(String(section.settings?.title || ''));
+    setEditSubtitle(String(section.settings?.subtitle || ''));
   }
 
   async function saveEdit() {
     if (!editingId) return;
+    const section = sections.find(s => s.id === editingId);
+    if (!section) return;
+
+    const newSettings = { ...section.settings, title: editTitle, subtitle: editSubtitle };
     try {
       await fetch('/api/admin/sections', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: editingId, siteSlug: slug, title: editTitle, subtitle: editSubtitle }),
+        body: JSON.stringify({ id: editingId, slug, settings: newSettings }),
       });
       setSections(prev =>
-        prev.map(s => s.id === editingId ? { ...s, title: editTitle, subtitle: editSubtitle } : s)
+        prev.map(s => s.id === editingId ? { ...s, settings: newSettings } : s)
       );
       setEditingId(null);
     } catch (e: unknown) {
@@ -106,10 +115,11 @@ export default function SectionManager({ slug }: { slug: string }) {
 
   async function handleAdd(sectionKey: string) {
     try {
+      const maxSort = sections.reduce((max, s) => Math.max(max, s.sortOrder), 0);
       const res = await fetch('/api/admin/sections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ siteSlug: slug, sectionKey }),
+        body: JSON.stringify({ slug, sectionKey, sortOrder: maxSort + 1 }),
       });
       if (!res.ok) throw new Error('추가 실패');
       setShowAdd(false);
@@ -125,7 +135,7 @@ export default function SectionManager({ slug }: { slug: string }) {
       await fetch('/api/admin/sections', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, siteSlug: slug }),
+        body: JSON.stringify({ id, slug }),
       });
       fetchSections();
     } catch { /* silent */ }
@@ -137,7 +147,6 @@ export default function SectionManager({ slug }: { slug: string }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
           <Link href={`/admin/${slug}`} className="text-gray-400 hover:text-gray-600 transition">
@@ -151,25 +160,18 @@ export default function SectionManager({ slug }: { slug: string }) {
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm text-gray-500">메인 페이지 섹션 구성 및 순서를 관리합니다.</p>
           {availableToAdd.length > 0 && (
-            <button onClick={() => setShowAdd(!showAdd)} className="px-4 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 transition">
-              + 섹션 추가
-            </button>
+            <button onClick={() => setShowAdd(!showAdd)} className="px-4 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 transition">+ 섹션 추가</button>
           )}
         </div>
 
         {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-200">{error}</div>}
 
-        {/* Add section panel */}
         {showAdd && availableToAdd.length > 0 && (
           <div className="mb-6 bg-white rounded-xl border border-gray-200 p-4">
             <h3 className="text-sm font-medium text-gray-700 mb-3">추가 가능한 섹션</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {availableToAdd.map(s => (
-                <button
-                  key={s.key}
-                  onClick={() => handleAdd(s.key)}
-                  className="text-left p-3 rounded-lg border border-gray-200 hover:border-gray-400 hover:bg-gray-50 transition"
-                >
+                <button key={s.key} onClick={() => handleAdd(s.key)} className="text-left p-3 rounded-lg border border-gray-200 hover:border-gray-400 hover:bg-gray-50 transition">
                   <p className="font-medium text-sm">{s.label}</p>
                   <p className="text-xs text-gray-500">{s.desc}</p>
                 </button>
@@ -178,7 +180,6 @@ export default function SectionManager({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* Section list */}
         {loading ? (
           <div className="text-center py-20 text-gray-400">불러오는 중...</div>
         ) : sections.length === 0 ? (
@@ -191,21 +192,11 @@ export default function SectionManager({ slug }: { slug: string }) {
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">섹션 제목</label>
-                      <input
-                        type="text"
-                        value={editTitle}
-                        onChange={e => setEditTitle(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
-                      />
+                      <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">부제목</label>
-                      <input
-                        type="text"
-                        value={editSubtitle}
-                        onChange={e => setEditSubtitle(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
-                      />
+                      <input type="text" value={editSubtitle} onChange={e => setEditSubtitle(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none" />
                     </div>
                     <div className="flex gap-2">
                       <button onClick={saveEdit} className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition">저장</button>
@@ -214,7 +205,6 @@ export default function SectionManager({ slug }: { slug: string }) {
                   </div>
                 ) : (
                   <div className="flex items-center gap-4">
-                    {/* Sort */}
                     <div className="flex flex-col gap-1">
                       <button onClick={() => handleMove(section.id, 'up')} disabled={idx === 0} className="text-gray-400 hover:text-gray-600 disabled:opacity-30">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
@@ -223,27 +213,16 @@ export default function SectionManager({ slug }: { slug: string }) {
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                       </button>
                     </div>
-
-                    {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                          {labelMap[section.sectionKey] || section.sectionKey}
-                        </span>
-                        {!section.isActive && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">비활성</span>
-                        )}
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{labelMap[section.sectionKey] || section.sectionKey}</span>
+                        {!section.isActive && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">비활성</span>}
                       </div>
-                      <p className="font-medium mt-1">{section.title || '(제목 없음)'}</p>
-                      {section.subtitle && <p className="text-sm text-gray-500">{section.subtitle}</p>}
+                      <p className="font-medium mt-1">{String(section.settings?.title || '') || '(제목 없음)'}</p>
+                      {section.settings?.subtitle ? <p className="text-sm text-gray-500">{String(section.settings.subtitle)}</p> : null}
                     </div>
-
-                    {/* Actions */}
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => handleToggle(section.id, section.isActive)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${section.isActive ? 'bg-green-500' : 'bg-gray-300'}`}
-                      >
+                      <button onClick={() => handleToggle(section.id, section.isActive)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${section.isActive ? 'bg-green-500' : 'bg-gray-300'}`}>
                         <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${section.isActive ? 'translate-x-6' : 'translate-x-1'}`} />
                       </button>
                       <button onClick={() => startEdit(section)} className="px-3 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 transition">수정</button>

@@ -3,8 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 
-type SettingsData = Record<string, string>;
-
 const TABS = [
   { key: 'base', label: '기본정보' },
   { key: 'design', label: '디자인' },
@@ -43,7 +41,6 @@ const FIELDS: Record<string, FieldDef[]> = {
   ],
   reserve: [
     { key: 'reserve_notice', label: '예약 안내 문구', type: 'textarea', placeholder: '예약 시 참고사항을 입력하세요' },
-    { key: 'reserve_fields', label: '예약 필드 설정 (JSON)', type: 'textarea', placeholder: '예: ["name","phone","treatment","date","memo"]' },
   ],
   headerfooter: [
     { key: 'logo_url', label: '로고 이미지 URL', type: 'text', placeholder: 'https://...' },
@@ -56,7 +53,8 @@ const FIELDS: Record<string, FieldDef[]> = {
 
 export default function SettingsManager({ slug }: { slug: string }) {
   const [activeTab, setActiveTab] = useState('base');
-  const [settings, setSettings] = useState<SettingsData>({});
+  // allConfigs stores the full config map: { base: {...}, design: {...}, ... }
+  const [allConfigs, setAllConfigs] = useState<Record<string, Record<string, string>>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -68,8 +66,13 @@ export default function SettingsManager({ slug }: { slug: string }) {
     try {
       const res = await fetch(`/api/admin/settings?slug=${slug}`);
       if (!res.ok) throw new Error('불러오기 실패');
-      const data = await res.json();
-      setSettings(data.settings ?? {});
+      const json = await res.json();
+      // json.data is { base: {...}, design: {...}, ... }
+      const configs: Record<string, Record<string, string>> = {};
+      for (const [section, data] of Object.entries(json.data || {})) {
+        configs[section] = (data as Record<string, string>) || {};
+      }
+      setAllConfigs(configs);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '오류 발생');
     } finally {
@@ -77,12 +80,16 @@ export default function SettingsManager({ slug }: { slug: string }) {
     }
   }, [slug]);
 
-  useEffect(() => {
-    fetchSettings();
-  }, [fetchSettings]);
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
+
+  // Current tab's data
+  const currentData = allConfigs[activeTab] || {};
 
   function handleChange(key: string, value: string) {
-    setSettings(prev => ({ ...prev, [key]: value }));
+    setAllConfigs(prev => ({
+      ...prev,
+      [activeTab]: { ...(prev[activeTab] || {}), [key]: value },
+    }));
     setSuccess('');
   }
 
@@ -94,7 +101,11 @@ export default function SettingsManager({ slug }: { slug: string }) {
       const res = await fetch('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ siteSlug: slug, tab: activeTab, settings }),
+        body: JSON.stringify({
+          slug,
+          section: activeTab,
+          data: allConfigs[activeTab] || {},
+        }),
       });
       if (!res.ok) throw new Error('저장 실패');
       setSuccess('설정이 저장되었습니다.');
@@ -110,7 +121,6 @@ export default function SettingsManager({ slug }: { slug: string }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
           <Link href={`/admin/${slug}`} className="text-gray-400 hover:text-gray-600 transition">
@@ -121,16 +131,13 @@ export default function SettingsManager({ slug }: { slug: string }) {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* Tabs */}
         <div className="flex gap-1 mb-6 overflow-x-auto pb-1">
           {TABS.map(t => (
             <button
               key={t.key}
               onClick={() => { setActiveTab(t.key); setSuccess(''); }}
               className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition ${
-                activeTab === t.key
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+                activeTab === t.key ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
               }`}
             >
               {t.label}
@@ -151,47 +158,20 @@ export default function SettingsManager({ slug }: { slug: string }) {
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">{field.label}</label>
                   {field.type === 'color' ? (
                     <div className="flex items-center gap-3">
-                      <input
-                        type="color"
-                        value={settings[field.key] || '#000000'}
-                        onChange={e => handleChange(field.key, e.target.value)}
-                        className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer p-0.5"
-                      />
-                      <input
-                        type="text"
-                        value={settings[field.key] || ''}
-                        onChange={e => handleChange(field.key, e.target.value)}
-                        placeholder="#000000"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
-                      />
+                      <input type="color" value={currentData[field.key] || '#000000'} onChange={e => handleChange(field.key, e.target.value)} className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer p-0.5" />
+                      <input type="text" value={currentData[field.key] || ''} onChange={e => handleChange(field.key, e.target.value)} placeholder="#000000" className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none" />
                     </div>
                   ) : field.type === 'textarea' ? (
-                    <textarea
-                      rows={field.key === 'privacy_policy' ? 12 : 4}
-                      value={settings[field.key] || ''}
-                      onChange={e => handleChange(field.key, e.target.value)}
-                      placeholder={field.placeholder}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none resize-y"
-                    />
+                    <textarea rows={field.key === 'privacy_policy' ? 12 : 4} value={currentData[field.key] || ''} onChange={e => handleChange(field.key, e.target.value)} placeholder={field.placeholder} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none resize-y" />
                   ) : (
-                    <input
-                      type="text"
-                      value={settings[field.key] || ''}
-                      onChange={e => handleChange(field.key, e.target.value)}
-                      placeholder={field.placeholder}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
-                    />
+                    <input type="text" value={currentData[field.key] || ''} onChange={e => handleChange(field.key, e.target.value)} placeholder={field.placeholder} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none" />
                   )}
                 </div>
               ))}
             </div>
 
             <div className="mt-6 flex justify-end">
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-6 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition disabled:opacity-50"
-              >
+              <button onClick={handleSave} disabled={saving} className="px-6 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition disabled:opacity-50">
                 {saving ? '저장 중...' : '저장'}
               </button>
             </div>

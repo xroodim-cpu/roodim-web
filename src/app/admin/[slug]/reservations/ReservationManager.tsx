@@ -6,11 +6,13 @@ import Link from 'next/link';
 interface Reservation {
   id: number;
   customerName: string;
-  phone: string;
-  treatment: string;
-  dateTime: string;
-  memo: string;
-  adminMemo: string;
+  customerPhone: string;
+  customerEmail: string | null;
+  treatmentName: string | null;
+  reservedDate: string;
+  reservedTime: string | null;
+  memo: string | null;
+  adminMemo: string | null;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   createdAt: string;
 }
@@ -52,8 +54,8 @@ export default function ReservationManager({ slug }: { slug: string }) {
       const q = filter !== 'all' ? `&status=${filter}` : '';
       const res = await fetch(`/api/admin/reservations?slug=${slug}${q}`);
       if (!res.ok) throw new Error('불러오기 실패');
-      const data = await res.json();
-      setReservations(data.reservations ?? []);
+      const json = await res.json();
+      setReservations(json.data ?? []);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '오류 발생');
     } finally {
@@ -61,16 +63,14 @@ export default function ReservationManager({ slug }: { slug: string }) {
     }
   }, [slug, filter]);
 
-  useEffect(() => {
-    fetchReservations();
-  }, [fetchReservations]);
+  useEffect(() => { fetchReservations(); }, [fetchReservations]);
 
   async function handleStatusChange(id: number, newStatus: string) {
     try {
       const res = await fetch('/api/admin/reservations', {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, siteSlug: slug, status: newStatus }),
+        body: JSON.stringify({ id, slug, status: newStatus }),
       });
       if (!res.ok) throw new Error('상태 변경 실패');
       setReservations(prev =>
@@ -84,9 +84,9 @@ export default function ReservationManager({ slug }: { slug: string }) {
   async function saveMemo(id: number) {
     try {
       await fetch('/api/admin/reservations', {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, siteSlug: slug, adminMemo: memoText }),
+        body: JSON.stringify({ id, slug, adminMemo: memoText }),
       });
       setReservations(prev =>
         prev.map(r => r.id === id ? { ...r, adminMemo: memoText } : r)
@@ -97,19 +97,14 @@ export default function ReservationManager({ slug }: { slug: string }) {
     }
   }
 
-  function formatDate(dt: string) {
-    if (!dt) return '-';
-    try {
-      return new Date(dt).toLocaleString('ko-KR', {
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit',
-      });
-    } catch { return dt; }
+  function formatDateTime(date: string, time: string | null) {
+    if (!date) return '-';
+    const d = date.split('T')[0]; // handle ISO format
+    return time ? `${d} ${time}` : d;
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center gap-3">
           <Link href={`/admin/${slug}`} className="text-gray-400 hover:text-gray-600 transition">
@@ -120,16 +115,13 @@ export default function ReservationManager({ slug }: { slug: string }) {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-6">
-        {/* Filter tabs */}
         <div className="flex gap-1 mb-6 overflow-x-auto pb-1">
           {STATUS_FILTERS.map(f => (
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
               className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition ${
-                filter === f.key
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+                filter === f.key ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
               }`}
             >
               {f.label}
@@ -155,18 +147,14 @@ export default function ReservationManager({ slug }: { slug: string }) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-bold">{r.customerName}</h3>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cfg.bg} ${cfg.text}`}>
-                          {cfg.label}
-                        </span>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cfg.bg} ${cfg.text}`}>{cfg.label}</span>
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
-                        <span>{r.phone}</span>
-                        <span>{r.treatment}</span>
-                        <span>{formatDate(r.dateTime)}</span>
+                        <span>{r.customerPhone}</span>
+                        {r.treatmentName && <span>{r.treatmentName}</span>}
+                        <span>{formatDateTime(r.reservedDate, r.reservedTime)}</span>
                       </div>
                     </div>
-
-                    {/* Status change */}
                     {nextStatuses.length > 0 && (
                       <div className="flex gap-1 flex-shrink-0">
                         {nextStatuses.map(ns => {
@@ -176,9 +164,7 @@ export default function ReservationManager({ slug }: { slug: string }) {
                               key={ns}
                               onClick={() => handleStatusChange(r.id, ns)}
                               className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition ${
-                                ns === 'cancelled'
-                                  ? 'text-red-600 border-red-200 hover:bg-red-50'
-                                  : `${nsCfg.text} border-gray-200 hover:bg-gray-50`
+                                ns === 'cancelled' ? 'text-red-600 border-red-200 hover:bg-red-50' : `${nsCfg.text} border-gray-200 hover:bg-gray-50`
                               }`}
                             >
                               {nsCfg.label}
@@ -189,42 +175,29 @@ export default function ReservationManager({ slug }: { slug: string }) {
                     )}
                   </div>
 
-                  {/* Customer memo */}
                   {r.memo && (
                     <div className="text-sm bg-gray-50 rounded-lg p-3 mb-3">
                       <span className="text-gray-500 font-medium">고객 메모:</span> {r.memo}
                     </div>
                   )}
 
-                  {/* Admin memo */}
                   <div className="text-sm">
                     {editingMemo === r.id ? (
                       <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={memoText}
-                          onChange={e => setMemoText(e.target.value)}
-                          placeholder="관리자 메모 입력..."
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
-                        />
+                        <input type="text" value={memoText} onChange={e => setMemoText(e.target.value)} placeholder="관리자 메모 입력..." className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none" />
                         <button onClick={() => saveMemo(r.id)} className="px-3 py-2 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-800 transition">저장</button>
                         <button onClick={() => setEditingMemo(null)} className="px-3 py-2 bg-gray-100 text-xs rounded-lg hover:bg-gray-200 transition">취소</button>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => { setEditingMemo(r.id); setMemoText(r.adminMemo || ''); }}
-                        className="text-gray-400 hover:text-gray-600 transition"
-                      >
+                      <button onClick={() => { setEditingMemo(r.id); setMemoText(r.adminMemo || ''); }} className="text-gray-400 hover:text-gray-600 transition">
                         {r.adminMemo ? (
                           <span><span className="text-gray-500 font-medium">관리자 메모:</span> <span className="text-gray-600">{r.adminMemo}</span></span>
-                        ) : (
-                          '+ 관리자 메모 추가'
-                        )}
+                        ) : '+ 관리자 메모 추가'}
                       </button>
                     )}
                   </div>
 
-                  <div className="mt-3 text-xs text-gray-400">접수: {formatDate(r.createdAt)}</div>
+                  <div className="mt-3 text-xs text-gray-400">접수: {new Date(r.createdAt).toLocaleString('ko-KR')}</div>
                 </div>
               );
             })}

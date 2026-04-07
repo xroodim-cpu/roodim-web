@@ -17,7 +17,6 @@ export async function GET(request: NextRequest) {
     .from(siteConfigs)
     .where(eq(siteConfigs.siteId, session.site_id));
 
-  // Transform to a section-keyed map for convenience
   const configMap: Record<string, unknown> = {};
   for (const row of rows) {
     configMap[row.section] = row.data;
@@ -36,23 +35,26 @@ export async function PUT(request: NextRequest) {
   const session = await verifyAdminAccess(slug);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Upsert: insert or update on conflict
-  const [row] = await db
-    .insert(siteConfigs)
-    .values({
-      siteId: session.site_id,
-      section,
-      data,
-      updatedAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: [siteConfigs.siteId, siteConfigs.section],
-      set: {
-        data,
-        updatedAt: new Date(),
-      },
-    })
-    .returning();
+  // Check if config exists
+  const existing = await db
+    .select({ id: siteConfigs.id })
+    .from(siteConfigs)
+    .where(and(eq(siteConfigs.siteId, session.site_id), eq(siteConfigs.section, section)))
+    .limit(1);
+
+  let row;
+  if (existing[0]) {
+    [row] = await db
+      .update(siteConfigs)
+      .set({ data, updatedAt: new Date() })
+      .where(and(eq(siteConfigs.siteId, session.site_id), eq(siteConfigs.section, section)))
+      .returning();
+  } else {
+    [row] = await db
+      .insert(siteConfigs)
+      .values({ siteId: session.site_id, section, data, updatedAt: new Date() })
+      .returning();
+  }
 
   return NextResponse.json({ ok: true, data: row });
 }
