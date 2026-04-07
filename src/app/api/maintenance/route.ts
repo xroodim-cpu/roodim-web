@@ -38,8 +38,10 @@ export async function POST(req: NextRequest) {
 
     const requestId = result[0].id;
 
-    // 어드민 동기화 시도 (백그라운드)
-    syncToAdmin(site[0].id, requestId, body).catch(() => {});
+    // 어드민 동기화 시도 (논블로킹 — 실패해도 요청은 이미 저장됨)
+    syncToAdmin(site[0].id, requestId, body).catch((err) => {
+      console.error(`[maintenance] Background sync for #${requestId} failed:`, err);
+    });
 
     return NextResponse.json({
       ok: true,
@@ -75,6 +77,7 @@ async function syncToAdmin(siteId: string, requestId: number, data: Record<strin
           externalAdminId: (result.data as { admin_id?: number })?.admin_id ?? null,
         })
         .where(eq(maintenanceRequests.id, requestId));
+      console.log(`[maintenance] #${requestId} synced to admin immediately`);
     } else {
       await db.update(maintenanceRequests)
         .set({
@@ -83,6 +86,7 @@ async function syncToAdmin(siteId: string, requestId: number, data: Record<strin
           nextRetryAt: new Date(Date.now() + 60_000),
         })
         .where(eq(maintenanceRequests.id, requestId));
+      console.warn(`[maintenance] #${requestId} immediate sync failed: ${result.error} — will retry via cron`);
     }
   } catch (error) {
     await db.update(maintenanceRequests)
@@ -92,5 +96,6 @@ async function syncToAdmin(siteId: string, requestId: number, data: Record<strin
         nextRetryAt: new Date(Date.now() + 60_000),
       })
       .where(eq(maintenanceRequests.id, requestId));
+    console.error(`[maintenance] #${requestId} immediate sync exception — will retry via cron:`, error);
   }
 }

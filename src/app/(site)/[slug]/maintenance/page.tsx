@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 
 const CATEGORIES = [
   { value: 'design_change', label: '디자인 수정' },
@@ -13,6 +13,7 @@ const CATEGORIES = [
 
 export default function MaintenancePage() {
   const params = useParams();
+  const router = useRouter();
   const slug = params.slug as string;
 
   const [title, setTitle] = useState('');
@@ -23,11 +24,29 @@ export default function MaintenancePage() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  function validatePhone(value: string): boolean {
+    return /^01[016789]-?\d{3,4}-?\d{4}$/.test(value.replace(/\s/g, ''));
+  }
 
   async function handleSubmit() {
-    if (!title || !description || !name || !phone) {
-      alert('제목, 내용, 이름, 연락처를 입력해주세요.');
+    setErrorMsg('');
+
+    if (!title.trim()) {
+      setErrorMsg('제목을 입력해주세요.');
+      return;
+    }
+    if (!description.trim()) {
+      setErrorMsg('상세 내용을 입력해주세요.');
+      return;
+    }
+    if (!name.trim()) {
+      setErrorMsg('이름을 입력해주세요.');
+      return;
+    }
+    if (!phone.trim() || !validatePhone(phone)) {
+      setErrorMsg('올바른 연락처를 입력해주세요. (예: 010-1234-5678)');
       return;
     }
 
@@ -38,45 +57,29 @@ export default function MaintenancePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           site_slug: slug,
-          title,
-          description,
+          title: title.trim(),
+          description: description.trim(),
           category,
           priority,
-          requested_by: { name, phone, email: email || undefined },
+          requested_by: { name: name.trim(), phone: phone.trim(), email: email.trim() || undefined },
         }),
       });
 
       const data = await res.json();
       if (data.ok) {
-        setDone(true);
+        const qp = new URLSearchParams({
+          title: title.trim(),
+          category,
+        });
+        router.push(`/${slug}/maintenance/complete?${qp.toString()}`);
       } else {
-        alert(data.error || '요청 접수에 실패했습니다.');
+        setErrorMsg(data.error || '요청 접수에 실패했습니다. 잠시 후 다시 시도해주세요.');
       }
     } catch {
-      alert('네트워크 오류가 발생했습니다.');
+      setErrorMsg('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.');
     } finally {
       setSubmitting(false);
     }
-  }
-
-  // 완료 화면
-  if (done) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold mb-2">유지보수 요청이 접수되었습니다</h2>
-          <p className="text-gray-500 mb-6">검토 후 연락드리겠습니다.</p>
-          <a href={`/${slug}`} className="inline-block px-6 py-3 bg-gray-900 text-white rounded-lg font-medium">
-            홈으로 돌아가기
-          </a>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -182,10 +185,16 @@ export default function MaintenancePage() {
           </div>
         </div>
 
+        {errorMsg && (
+          <div className="mt-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-200">
+            {errorMsg}
+          </div>
+        )}
+
         <button
           onClick={handleSubmit}
           disabled={submitting}
-          className="w-full mt-6 py-3.5 rounded-xl text-white font-bold disabled:opacity-50 transition"
+          className="w-full mt-4 py-3.5 rounded-xl text-white font-bold disabled:opacity-50 transition"
           style={{ background: 'var(--color-primary, #cc222c)' }}
         >
           {submitting ? '접수 중...' : '유지보수 요청하기'}

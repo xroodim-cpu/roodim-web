@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { reservations, maintenanceRequests } from '@/drizzle/schema';
-import { eq, and, lte, sql } from 'drizzle-orm';
+import { eq, and, lte, or, isNull } from 'drizzle-orm';
 import { adminApi } from '@/lib/admin-api';
 
 /**
@@ -18,13 +18,19 @@ export async function GET(req: Request) {
   const now = new Date();
   let syncedReservations = 0;
   let syncedMaintenance = 0;
+  let failedReservations = 0;
+  let failedMaintenance = 0;
 
   // === 예약 동기화 재시도 ===
+  // nextRetryAt이 null인 항목(최초 동기화 실패 후 아직 재시도 안 된 것)도 포함
   const pendingReservations = await db.select()
     .from(reservations)
     .where(and(
       eq(reservations.syncStatus, 'pending'),
-      lte(reservations.nextRetryAt, now)
+      or(
+        isNull(reservations.nextRetryAt),
+        lte(reservations.nextRetryAt, now)
+      )
     ))
     .limit(20);
 
@@ -50,27 +56,34 @@ export async function GET(req: Request) {
           })
           .where(eq(reservations.id, r.id));
         syncedReservations++;
+        console.log(`[sync] Reservation #${r.id} synced successfully`);
       } else {
         const attempts = r.syncAttempts + 1;
+        const nextStatus = attempts >= 5 ? 'failed' : 'pending';
         await db.update(reservations)
           .set({
             syncAttempts: attempts,
             lastSyncError: result.error || 'Unknown',
-            syncStatus: attempts >= 5 ? 'failed' : 'pending',
+            syncStatus: nextStatus,
             nextRetryAt: getNextRetry(attempts),
           })
           .where(eq(reservations.id, r.id));
+        failedReservations++;
+        console.warn(`[sync] Reservation #${r.id} attempt ${attempts} failed: ${result.error}${nextStatus === 'failed' ? ' (max retries reached)' : ''}`);
       }
     } catch (error) {
       const attempts = r.syncAttempts + 1;
+      const nextStatus = attempts >= 5 ? 'failed' : 'pending';
       await db.update(reservations)
         .set({
           syncAttempts: attempts,
           lastSyncError: String(error),
-          syncStatus: attempts >= 5 ? 'failed' : 'pending',
+          syncStatus: nextStatus,
           nextRetryAt: getNextRetry(attempts),
         })
         .where(eq(reservations.id, r.id));
+      failedReservations++;
+      console.error(`[sync] Reservation #${r.id} attempt ${attempts} exception:`, error);
     }
   }
 
@@ -79,7 +92,10 @@ export async function GET(req: Request) {
     .from(maintenanceRequests)
     .where(and(
       eq(maintenanceRequests.syncStatus, 'pending'),
-      lte(maintenanceRequests.nextRetryAt, now)
+      or(
+        isNull(maintenanceRequests.nextRetryAt),
+        lte(maintenanceRequests.nextRetryAt, now)
+      )
     ))
     .limit(20);
 
@@ -104,33 +120,43 @@ export async function GET(req: Request) {
           })
           .where(eq(maintenanceRequests.id, m.id));
         syncedMaintenance++;
+        console.log(`[sync] Maintenance #${m.id} synced successfully`);
       } else {
         const attempts = m.syncAttempts + 1;
+        const nextStatus = attempts >= 5 ? 'failed' : 'pending';
         await db.update(maintenanceRequests)
           .set({
             syncAttempts: attempts,
             lastSyncError: result.error || 'Unknown',
-            syncStatus: attempts >= 5 ? 'failed' : 'pending',
+            syncStatus: nextStatus,
             nextRetryAt: getNextRetry(attempts),
           })
           .where(eq(maintenanceRequests.id, m.id));
+        failedMaintenance++;
+        console.warn(`[sync] Maintenance #${m.id} attempt ${attempts} failed: ${result.error}${nextStatus === 'failed' ? ' (max retries reached)' : ''}`);
       }
     } catch (error) {
       const attempts = m.syncAttempts + 1;
+      const nextStatus = attempts >= 5 ? 'failed' : 'pending';
       await db.update(maintenanceRequests)
         .set({
           syncAttempts: attempts,
           lastSyncError: String(error),
-          syncStatus: attempts >= 5 ? 'failed' : 'pending',
+          syncStatus: nextStatus,
           nextRetryAt: getNextRetry(attempts),
         })
         .where(eq(maintenanceRequests.id, m.id));
+      failedMaintenance++;
+      console.error(`[sync] Maintenance #${m.id} attempt ${attempts} exception:`, error);
     }
   }
+
+  console.log(`[sync] Completed: reservations=${syncedReservations}ok/${failedReservations}fail, maintenance=${syncedMaintenance}ok/${failedMaintenance}fail`);
 
   return NextResponse.json({
     ok: true,
     synced: { reservations: syncedReservations, maintenance: syncedMaintenance },
+    failed: { reservations: failedReservations, maintenance: failedMaintenance },
     pending: { reservations: pendingReservations.length, maintenance: pendingMaintenance.length },
   });
 }

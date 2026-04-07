@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 
 interface Treatment {
   id: number;
@@ -12,9 +12,11 @@ interface Treatment {
 
 export default function ReservePage() {
   const params = useParams();
+  const router = useRouter();
   const slug = params.slug as string;
 
   const [step, setStep] = useState(1); // 1: 시술 선택, 2: 날짜/시간, 3: 연락처
+  const [errorMsg, setErrorMsg] = useState('');
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [selectedTreatment, setSelectedTreatment] = useState<Treatment | null>(null);
   const [reservedDate, setReservedDate] = useState('');
@@ -24,7 +26,6 @@ export default function ReservePage() {
   const [email, setEmail] = useState('');
   const [memo, setMemo] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
 
   // 시술 목록 로드
   useEffect(() => {
@@ -36,10 +37,25 @@ export default function ReservePage() {
       .catch(() => {});
   }, [slug]);
 
+  // 연락처 형식 검증
+  function validatePhone(value: string): boolean {
+    return /^01[016789]-?\d{3,4}-?\d{4}$/.test(value.replace(/\s/g, ''));
+  }
+
   // 예약 제출
   async function handleSubmit() {
-    if (!name || !phone || !reservedDate) {
-      alert('이름, 연락처, 날짜를 입력해주세요.');
+    setErrorMsg('');
+
+    if (!name.trim()) {
+      setErrorMsg('이름을 입력해주세요.');
+      return;
+    }
+    if (!phone.trim() || !validatePhone(phone)) {
+      setErrorMsg('올바른 연락처를 입력해주세요. (예: 010-1234-5678)');
+      return;
+    }
+    if (!reservedDate) {
+      setErrorMsg('날짜를 선택해주세요.');
       return;
     }
 
@@ -50,54 +66,33 @@ export default function ReservePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           site_slug: slug,
-          customer_name: name,
-          customer_phone: phone,
-          customer_email: email || undefined,
+          customer_name: name.trim(),
+          customer_phone: phone.trim(),
+          customer_email: email.trim() || undefined,
           treatment_name: selectedTreatment?.title || '',
           reserved_date: reservedDate,
           reserved_time: reservedTime || undefined,
-          memo: memo || undefined,
+          memo: memo.trim() || undefined,
         }),
       });
 
       const data = await res.json();
       if (data.ok) {
-        setDone(true);
+        const qp = new URLSearchParams({
+          name: name.trim(),
+          date: reservedDate,
+          ...(reservedTime && { time: reservedTime }),
+          ...(selectedTreatment?.title && { treatment: selectedTreatment.title }),
+        });
+        router.push(`/${slug}/reserve/complete?${qp.toString()}`);
       } else {
-        alert(data.error || '예약에 실패했습니다.');
+        setErrorMsg(data.error || '예약에 실패했습니다. 잠시 후 다시 시도해주세요.');
       }
     } catch {
-      alert('네트워크 오류가 발생했습니다.');
+      setErrorMsg('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.');
     } finally {
       setSubmitting(false);
     }
-  }
-
-  // 예약 완료 화면
-  if (done) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold mb-2">예약이 접수되었습니다</h2>
-          <p className="text-gray-500 mb-6">확인 후 연락드리겠습니다.</p>
-          <div className="bg-gray-50 rounded-lg p-4 text-left text-sm space-y-1">
-            {selectedTreatment && <p><span className="text-gray-400">시술:</span> {selectedTreatment.title}</p>}
-            <p><span className="text-gray-400">날짜:</span> {reservedDate}</p>
-            {reservedTime && <p><span className="text-gray-400">시간:</span> {reservedTime}</p>}
-            <p><span className="text-gray-400">이름:</span> {name}</p>
-            <p><span className="text-gray-400">연락처:</span> {phone}</p>
-          </div>
-          <a href={`/${slug}`} className="inline-block mt-6 px-6 py-3 bg-gray-900 text-white rounded-lg font-medium">
-            홈으로 돌아가기
-          </a>
-        </div>
-      </div>
-    );
   }
 
   // 오늘 이후 날짜만 선택 가능
@@ -304,6 +299,12 @@ export default function ReservePage() {
               <p><span className="text-gray-400">날짜:</span> {reservedDate}</p>
               {reservedTime && <p><span className="text-gray-400">시간:</span> {reservedTime}</p>}
             </div>
+
+            {errorMsg && (
+              <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-200">
+                {errorMsg}
+              </div>
+            )}
 
             <div className="flex gap-3">
               <button onClick={() => setStep(2)} className="flex-1 py-3 rounded-xl border border-gray-300 font-medium">이전</button>

@@ -40,8 +40,10 @@ export async function POST(req: NextRequest) {
 
     const reservationId = result[0].id;
 
-    // 어드민 동기화 시도 (백그라운드)
-    syncToAdmin(site[0].id, reservationId, body).catch(() => {});
+    // 어드민 동기화 시도 (논블로킹 — 실패해도 예약은 이미 저장됨)
+    syncToAdmin(site[0].id, reservationId, body).catch((err) => {
+      console.error(`[reservation] Background sync for #${reservationId} failed:`, err);
+    });
 
     return NextResponse.json({
       ok: true,
@@ -78,8 +80,9 @@ async function syncToAdmin(siteId: string, reservationId: number, data: Record<s
           externalAdminId: (result.data as { admin_id?: number })?.admin_id ?? null,
         })
         .where(eq(reservations.id, reservationId));
+      console.log(`[reservation] #${reservationId} synced to admin immediately`);
     } else {
-      // 실패 — 1분 후 재시도
+      // 실패 — 1분 후 cron에서 재시도
       await db.update(reservations)
         .set({
           syncAttempts: 1,
@@ -87,6 +90,7 @@ async function syncToAdmin(siteId: string, reservationId: number, data: Record<s
           nextRetryAt: new Date(Date.now() + 60_000),
         })
         .where(eq(reservations.id, reservationId));
+      console.warn(`[reservation] #${reservationId} immediate sync failed: ${result.error} — will retry via cron`);
     }
   } catch (error) {
     await db.update(reservations)
@@ -96,5 +100,6 @@ async function syncToAdmin(siteId: string, reservationId: number, data: Record<s
         nextRetryAt: new Date(Date.now() + 60_000),
       })
       .where(eq(reservations.id, reservationId));
+    console.error(`[reservation] #${reservationId} immediate sync exception — will retry via cron:`, error);
   }
 }

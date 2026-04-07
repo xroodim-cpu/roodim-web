@@ -1,9 +1,22 @@
 import { notFound } from 'next/navigation';
-import { getSiteBySlug, getContentsByType } from '@/lib/site';
+import { getSiteBySlug, getAllSiteConfigs, getContentsByType } from '@/lib/site';
 import Link from 'next/link';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps) {
+  const { slug } = await params;
+  const site = await getSiteBySlug(slug);
+  if (!site) return {};
+  const configs = await getAllSiteConfigs(site.id);
+  const base = configs['base'] || {};
+  const siteName = (base.site_name as string) || site.name;
+  return {
+    title: `시술 안내 | ${siteName}`,
+    description: `${siteName}의 시술 안내 페이지입니다.`,
+  };
 }
 
 export default async function TreatListPage({ params }: PageProps) {

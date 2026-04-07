@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 
 interface Reservation {
@@ -16,6 +16,9 @@ interface Reservation {
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   createdAt: string;
 }
+
+const AUTO_REFRESH_MS = 30_000; // 30초
+const NEW_BADGE_THRESHOLD_MS = 60 * 60 * 1000; // 1시간
 
 const STATUS_FILTERS = [
   { key: 'all', label: '전체' },
@@ -39,6 +42,10 @@ const NEXT_STATUSES: Record<string, string[]> = {
   cancelled: [],
 };
 
+function isNewReservation(createdAt: string): boolean {
+  return Date.now() - new Date(createdAt).getTime() < NEW_BADGE_THRESHOLD_MS;
+}
+
 export default function ReservationManager({ slug }: { slug: string }) {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,9 +53,10 @@ export default function ReservationManager({ slug }: { slug: string }) {
   const [filter, setFilter] = useState('all');
   const [editingMemo, setEditingMemo] = useState<number | null>(null);
   const [memoText, setMemoText] = useState('');
+  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchReservations = useCallback(async () => {
-    setLoading(true);
+  const fetchReservations = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError('');
     try {
       const q = filter !== 'all' ? `&status=${filter}` : '';
@@ -59,11 +67,25 @@ export default function ReservationManager({ slug }: { slug: string }) {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '오류 발생');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [slug, filter]);
 
+  // 초기 로드 + 필터 변경 시
   useEffect(() => { fetchReservations(); }, [fetchReservations]);
+
+  // 30초 자동 새로고침
+  useEffect(() => {
+    refreshTimerRef.current = setInterval(() => {
+      fetchReservations(true);
+    }, AUTO_REFRESH_MS);
+    return () => {
+      if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
+    };
+  }, [fetchReservations]);
+
+  // 대기 중 예약 수
+  const pendingCount = reservations.filter(r => r.status === 'pending').length;
 
   async function handleStatusChange(id: number, newStatus: string) {
     try {
@@ -111,6 +133,21 @@ export default function ReservationManager({ slug }: { slug: string }) {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           </Link>
           <h1 className="text-lg font-bold">예약 관리</h1>
+          {pendingCount > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 text-xs font-bold text-white bg-red-500 rounded-full">
+              {pendingCount}
+            </span>
+          )}
+          <div className="flex-1" />
+          <button
+            onClick={() => fetchReservations(true)}
+            className="text-gray-400 hover:text-gray-600 transition"
+            title="새로고침"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -148,6 +185,11 @@ export default function ReservationManager({ slug }: { slug: string }) {
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-bold">{r.customerName}</h3>
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cfg.bg} ${cfg.text}`}>{cfg.label}</span>
+                        {isNewReservation(r.createdAt) && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold text-white bg-red-500 animate-pulse">
+                            새 예약
+                          </span>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
                         <span>{r.customerPhone}</span>
