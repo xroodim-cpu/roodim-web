@@ -10,6 +10,7 @@ const TABS = [
   { key: 'reserve', label: '예약설정' },
   { key: 'headerfooter', label: '헤더/푸터' },
   { key: 'policy', label: '정책' },
+  { key: 'domain', label: '도메인' },
 ];
 
 interface FieldDef {
@@ -59,6 +60,10 @@ export default function SettingsManager({ slug }: { slug: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  // Domain tab state
+  const [domainValue, setDomainValue] = useState('');
+  const [domainLoading, setDomainLoading] = useState(false);
+  const [domainSaving, setDomainSaving] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
@@ -81,6 +86,47 @@ export default function SettingsManager({ slug }: { slug: string }) {
   }, [slug]);
 
   useEffect(() => { fetchSettings(); }, [fetchSettings]);
+
+  // Fetch domain when domain tab is active
+  const fetchDomain = useCallback(async () => {
+    setDomainLoading(true);
+    try {
+      const res = await fetch(`/api/admin/domain?slug=${slug}`);
+      if (!res.ok) throw new Error('도메인 정보를 불러올 수 없습니다');
+      const json = await res.json();
+      setDomainValue(json.data?.customDomain || '');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '오류 발생');
+    } finally {
+      setDomainLoading(false);
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    if (activeTab === 'domain') fetchDomain();
+  }, [activeTab, fetchDomain]);
+
+  async function handleDomainSave() {
+    setDomainSaving(true);
+    setError('');
+    setSuccess('');
+    try {
+      const res = await fetch('/api/admin/domain', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, domain: domainValue }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || '저장 실패');
+      setDomainValue(json.data?.customDomain || '');
+      setSuccess('도메인 설정이 저장되었습니다.');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '오류 발생');
+    } finally {
+      setDomainSaving(false);
+    }
+  }
 
   // Current tab's data
   const currentData = allConfigs[activeTab] || {};
@@ -148,7 +194,61 @@ export default function SettingsManager({ slug }: { slug: string }) {
         {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-200">{error}</div>}
         {success && <div className="mb-4 p-3 bg-green-50 text-green-600 text-sm rounded-lg border border-green-200">{success}</div>}
 
-        {loading ? (
+        {activeTab === 'domain' ? (
+          domainLoading ? (
+            <div className="text-center py-20 text-gray-400">불러오는 중...</div>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">커스텀 도메인</label>
+                  <input
+                    type="text"
+                    value={domainValue}
+                    onChange={e => { setDomainValue(e.target.value); setSuccess(''); }}
+                    placeholder="example.com"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
+                  />
+                  <p className="mt-1.5 text-xs text-gray-400">비워두면 커스텀 도메인이 해제됩니다.</p>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-blue-900 mb-2">DNS 설정 안내</h3>
+                  <p className="text-sm text-blue-800 mb-3">
+                    도메인 등록 업체(가비아, 카페24, Cloudflare 등)에서 아래와 같이 DNS 레코드를 추가해 주세요.
+                  </p>
+                  <div className="bg-white rounded-lg border border-blue-100 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-blue-50">
+                        <tr>
+                          <th className="text-left px-3 py-2 text-blue-700 font-medium">타입</th>
+                          <th className="text-left px-3 py-2 text-blue-700 font-medium">이름</th>
+                          <th className="text-left px-3 py-2 text-blue-700 font-medium">값</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="px-3 py-2 font-mono text-blue-900">CNAME</td>
+                          <td className="px-3 py-2 font-mono text-blue-900">{domainValue || 'your-domain.com'}</td>
+                          <td className="px-3 py-2 font-mono text-blue-900">roodim-web.vercel.app</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="mt-2 text-xs text-blue-600">
+                    DNS 설정 후 반영까지 최대 48시간이 소요될 수 있습니다. Vercel에서 자동으로 SSL 인증서를 발급합니다.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <button onClick={handleDomainSave} disabled={domainSaving} className="px-6 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition disabled:opacity-50">
+                  {domainSaving ? '저장 중...' : '저장'}
+                </button>
+              </div>
+            </div>
+          )
+        ) : loading ? (
           <div className="text-center py-20 text-gray-400">불러오는 중...</div>
         ) : (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
