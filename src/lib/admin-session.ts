@@ -4,25 +4,22 @@ import { cookies } from 'next/headers';
 interface AdminSession {
   site_id: string;
   slug: string;
-  member_id: number;
+  member_id?: number;
+  credential_id?: number;
   name: string;
   role: string;
+  auth_type: 'sso' | 'credential';
   exp: number;
 }
 
 /**
- * 어드민 세션 검증 (Server Component / Route Handler에서 사용)
+ * 쿠키에서 HMAC 서명된 세션 파싱
  */
-export async function getAdminSession(): Promise<AdminSession | null> {
+function parseSessionCookie(cookieValue: string): AdminSession | null {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('admin_session');
-    if (!sessionCookie) return null;
-
-    const [token, signature] = sessionCookie.value.split('.');
+    const [token, signature] = cookieValue.split('.');
     if (!token || !signature) return null;
 
-    // 서명 검증
     const expectedSig = crypto
       .createHmac('sha256', process.env.SSO_SECRET!)
       .update(token)
@@ -32,18 +29,44 @@ export async function getAdminSession(): Promise<AdminSession | null> {
       return null;
     }
 
-    // 페이로드 파싱
     const padding = '='.repeat((4 - (token.length % 4)) % 4);
     const base64 = token.replace(/-/g, '+').replace(/_/g, '/') + padding;
-    const session: AdminSession = JSON.parse(Buffer.from(base64, 'base64').toString());
+    const session = JSON.parse(Buffer.from(base64, 'base64').toString());
 
-    // 만료 확인
     if (Date.now() / 1000 > session.exp) return null;
 
     return session;
   } catch {
     return null;
   }
+}
+
+/**
+ * 어드민 세션 검증 (SSO + 고객 로그인 듀얼 지원)
+ * 1. admin_session (SSO 직원 로그인) 우선 확인
+ * 2. site_admin_session (고객 이메일/비밀번호 로그인) 확인
+ */
+export async function getAdminSession(): Promise<AdminSession | null> {
+  const cookieStore = await cookies();
+
+  // SSO 세션 확인 (직원)
+  const ssoCookie = cookieStore.get('admin_session');
+  if (ssoCookie) {
+    const session = parseSessionCookie(ssoCookie.value);
+    if (session) {
+      // 기존 SSO 세션은 auth_type이 없을 수 있으므로 기본값 설정
+      return { ...session, auth_type: session.auth_type || 'sso' };
+    }
+  }
+
+  // 고객 로그인 세션 확인
+  const credCookie = cookieStore.get('site_admin_session');
+  if (credCookie) {
+    const session = parseSessionCookie(credCookie.value);
+    if (session) return session;
+  }
+
+  return null;
 }
 
 /**

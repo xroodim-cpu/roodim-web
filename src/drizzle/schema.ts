@@ -11,6 +11,9 @@ export const maintenanceStatusEnum = pgEnum('maintenance_status', ['pending', 'r
 export const syncStatusEnum = pgEnum('sync_status', ['pending', 'synced', 'failed']);
 export const adminRoleEnum = pgEnum('admin_role', ['owner', 'editor']);
 
+// ===== site_type enum =====
+export const siteTypeEnum = pgEnum('site_type', ['standalone', 'rental', 'partner', 'creator']);
+
 // ===== sites =====
 export const sites = pgTable('sites', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -19,6 +22,11 @@ export const sites = pgTable('sites', {
   customDomain: varchar('custom_domain', { length: 253 }),
   templateId: varchar('template_id', { length: 64 }).default('default'),
   status: siteStatusEnum('status').default('draft').notNull(),
+  // 사이트 유형 + 어드민 참조 (Laravel DB의 ID만 저장, FK 없음)
+  siteType: siteTypeEnum('site_type').default('standalone').notNull(),
+  adminCustomerId: integer('admin_customer_id'),
+  adminMemberId: integer('admin_member_id'),
+  adminOrganizationId: integer('admin_organization_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -153,3 +161,20 @@ export const usedSsoTokens = pgTable('used_sso_tokens', {
   usedAt: timestamp('used_at').defaultNow().notNull(),
   expiresAt: timestamp('expires_at').notNull(),
 });
+
+// ===== site_credentials (고객 로그인용) =====
+export const siteCredentials = pgTable('site_credentials', {
+  id: serial('id').primaryKey(),
+  siteId: uuid('site_id').notNull().references(() => sites.id, { onDelete: 'cascade' }),
+  email: varchar('email', { length: 255 }).notNull(),
+  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+  name: varchar('name', { length: 100 }).notNull(),
+  adminCustomerId: integer('admin_customer_id'),
+  adminMemberId: integer('admin_member_id'),
+  isActive: boolean('is_active').default(true).notNull(),
+  lastLoginAt: timestamp('last_login_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('site_credentials_site_email_idx').on(table.siteId, table.email),
+]);
