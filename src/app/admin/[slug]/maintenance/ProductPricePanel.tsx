@@ -9,54 +9,81 @@ interface Props {
 
 export default function ProductPricePanel({ products, onProductClick }: Props) {
   return (
-    <div className="flex flex-col h-full p-4">
-      {/* 타이틀 */}
-      <div className="flex items-center gap-2 mb-4">
-        <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-        </svg>
-        <h3 className="font-semibold text-gray-800 text-sm">프로젝트 가격표</h3>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '20px 16px' }}>
+      {/* 타이틀 — 루딤링크 섹션 헤더 스타일 */}
+      <div style={{
+        fontSize: '12px',
+        fontWeight: 700,
+        color: '#929aa6',
+        marginBottom: '12px',
+        letterSpacing: '-0.01em',
+      }}>
+        프로젝트 가격표
       </div>
 
       {/* 상품 목록 */}
       {products.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center text-gray-400">
-            <svg className="w-10 h-10 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            <p className="text-xs">가격표가 설정되지 않았습니다</p>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center', color: '#929aa6' }}>
+            <div style={{ fontSize: '36px', marginBottom: '8px', opacity: 0.3 }}>📋</div>
+            <p style={{ fontSize: '13px', fontWeight: 500 }}>가격표가 설정되지 않았습니다</p>
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto space-y-2">
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {products.map(product => (
             <button
               key={product.id}
               onClick={() => onProductClick(product)}
-              className="w-full text-left p-3 rounded-lg border border-gray-100 hover:border-[#cc222c]/30 hover:bg-red-50/30 transition group"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '10px',
+                border: '1px solid #e7eaef',
+                background: '#fff',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = 'rgba(204,34,44,0.3)';
+                e.currentTarget.style.background = 'rgba(204,34,44,0.02)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = '#e7eaef';
+                e.currentTarget.style.background = '#fff';
+              }}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm text-gray-800 truncate group-hover:text-[#cc222c] transition">
-                    {product.name}
-                  </div>
-                  {product.description && (
-                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">
-                      {product.description}
-                    </p>
-                  )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#1f2328' }}>
+                  {product.name}
                 </div>
-                <div className="flex-shrink-0 text-right">
-                  <div className="font-bold text-sm text-[#cc222c]">
-                    ₩{product.price.toLocaleString('ko-KR')}
+                {product.description && (
+                  <div style={{
+                    fontSize: '12px',
+                    color: '#6a737d',
+                    marginTop: '2px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {product.description}
                   </div>
-                  {product.price !== product.base_price && (
-                    <div className="text-[10px] text-gray-400 line-through">
-                      ₩{product.base_price.toLocaleString('ko-KR')}
-                    </div>
-                  )}
+                )}
+              </div>
+              <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#cc222c' }}>
+                  ₩{product.price.toLocaleString('ko-KR')}
                 </div>
+                {product.price !== product.base_price && (
+                  <div style={{ fontSize: '10px', color: '#bbc0c8', textDecoration: 'line-through' }}>
+                    ₩{product.base_price.toLocaleString('ko-KR')}
+                  </div>
+                )}
               </div>
             </button>
           ))}
@@ -64,8 +91,13 @@ export default function ProductPricePanel({ products, onProductClick }: Props) {
       )}
 
       {/* 하단 안내 */}
-      <div className="mt-3 pt-3 border-t border-gray-100">
-        <p className="text-[10px] text-gray-400 text-center">
+      <div style={{
+        marginTop: '12px',
+        paddingTop: '12px',
+        borderTop: '1px solid #f1f2f6',
+        textAlign: 'center',
+      }}>
+        <p style={{ fontSize: '11px', color: '#bbc0c8' }}>
           상품 클릭 시 채팅창에 자동 입력됩니다
         </p>
       </div>
