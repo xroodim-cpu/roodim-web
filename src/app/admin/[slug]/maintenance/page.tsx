@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { verifyAdminAccess } from '@/lib/admin-session';
-import MaintenanceList from './MaintenanceList';
+import MaintenanceWorkspace from './MaintenanceWorkspace';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -11,5 +11,5 @@ export default async function MaintenancePage({ params }: PageProps) {
   const session = await verifyAdminAccess(slug);
   if (!session) redirect('/admin/sso?error=unauthorized');
 
-  return <MaintenanceList slug={slug} />;
+  return <MaintenanceWorkspace slug={slug} />;
 }

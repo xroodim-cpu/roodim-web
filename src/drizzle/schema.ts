@@ -144,6 +144,20 @@ export const maintenanceRequests = pgTable('maintenance_requests', {
   index('maintenance_sync_idx').on(table.syncStatus, table.nextRetryAt),
 ]);
 
+// ===== maintenance_messages (채팅) =====
+export const maintenanceMessages = pgTable('maintenance_messages', {
+  id: serial('id').primaryKey(),
+  maintenanceRequestId: integer('maintenance_request_id').notNull()
+    .references(() => maintenanceRequests.id, { onDelete: 'cascade' }),
+  senderType: varchar('sender_type', { length: 20 }).notNull(), // 'customer' | 'staff'
+  senderName: varchar('sender_name', { length: 100 }).notNull(),
+  body: text('body').notNull(),
+  attachments: jsonb('attachments').default([]),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('maintenance_messages_request_idx').on(table.maintenanceRequestId),
+]);
+
 // ===== site_admins (SSO) =====
 export const siteAdmins = pgTable('site_admins', {
   id: serial('id').primaryKey(),
