@@ -192,3 +192,21 @@ export const siteCredentials = pgTable('site_credentials', {
 }, (table) => [
   uniqueIndex('site_credentials_site_email_idx').on(table.siteId, table.email),
 ]);
+
+// ===== site_files (회원 임대 홈페이지 파일 저장 - 카페24 방식) =====
+export const siteFiles = pgTable('site_files', {
+  id: serial('id').primaryKey(),
+  siteId: uuid('site_id').notNull().references(() => sites.id, { onDelete: 'cascade' }),
+  filename: varchar('filename', { length: 255 }).notNull(),
+  filePath: varchar('file_path', { length: 500 }),
+  fileType: varchar('file_type', { length: 20 }).notNull(), // html, css, js, image
+  content: text('content'),                                    // HTML/CSS/JS 텍스트 내용
+  blobUrl: varchar('blob_url', { length: 1000 }),             // 이미지 등 바이너리 URL
+  fileSize: integer('file_size').default(0),
+  isEntry: boolean('is_entry').default(false),                 // index.html = true
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('site_files_site_filename_idx').on(table.siteId, table.filename),
+]);

@@ -1,5 +1,5 @@
 import { db } from './db';
-import { sites, siteConfigs, siteSections, siteContents, siteMenuItems } from '@/drizzle/schema';
+import { sites, siteConfigs, siteSections, siteContents, siteMenuItems, siteFiles } from '@/drizzle/schema';
 import { eq, and, asc, desc } from 'drizzle-orm';
 
 /**
@@ -84,4 +84,41 @@ export async function getMenuItems(siteId: string, menuType: string) {
       eq(siteMenuItems.isActive, true)
     ))
     .orderBy(asc(siteMenuItems.sortOrder));
+}
+
+// ===== 사이트 파일 관련 (회원 임대 홈페이지) =====
+
+/**
+ * 사이트의 파일 목록 조회
+ */
+export async function getSiteFileList(siteId: string) {
+  return db.select()
+    .from(siteFiles)
+    .where(eq(siteFiles.siteId, siteId))
+    .orderBy(asc(siteFiles.sortOrder), asc(siteFiles.filename));
+}
+
+/**
+ * 사이트의 특정 파일 조회
+ */
+export async function getSiteFile(siteId: string, filename: string) {
+  const result = await db.select()
+    .from(siteFiles)
+    .where(and(
+      eq(siteFiles.siteId, siteId),
+      eq(siteFiles.filename, filename)
+    ))
+    .limit(1);
+  return result[0] || null;
+}
+
+/**
+ * 파일 ID로 조회
+ */
+export async function getSiteFileById(fileId: number) {
+  const result = await db.select()
+    .from(siteFiles)
+    .where(eq(siteFiles.id, fileId))
+    .limit(1);
+  return result[0] || null;
 }
