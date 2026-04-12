@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
+import postgres from 'postgres';
 
 // Simple in-memory cache for domain -> slug mapping
 const domainCache = new Map<string, { slug: string; siteType: string; expires: number }>();
 // Cache for slug -> siteType (main domain requests)
 const slugTypeCache = new Map<string, { siteType: string; expires: number }>();
 const CACHE_TTL = 60 * 1000; // 1 minute
+
+// Shared postgres client for middleware
+const sql = postgres(process.env.DATABASE_URL!, {
+  max: 3,
+  idle_timeout: 20,
+  connect_timeout: 10,
+});
 
 const MAIN_DOMAINS = [
   'roodim-web.vercel.app',
@@ -45,8 +53,6 @@ export async function middleware(request: NextRequest) {
     }
 
     try {
-      const { neon } = await import('@neondatabase/serverless');
-      const sql = neon(process.env.DATABASE_URL!);
       const rows = await sql`SELECT slug, site_type FROM sites WHERE custom_domain = ${hostWithoutPort} AND status = ${'active'} LIMIT 1`;
 
       if (rows.length > 0) {
@@ -93,8 +99,6 @@ export async function middleware(request: NextRequest) {
 
   // DB에서 siteType 확인
   try {
-    const { neon } = await import('@neondatabase/serverless');
-    const sql = neon(process.env.DATABASE_URL!);
     const rows = await sql`SELECT site_type FROM sites WHERE slug = ${slug} AND status = ${'active'} LIMIT 1`;
 
     if (rows.length > 0) {
