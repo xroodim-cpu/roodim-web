@@ -27,6 +27,10 @@ export const sites = pgTable('sites', {
   adminCustomerId: integer('admin_customer_id'),
   adminMemberId: integer('admin_member_id'),
   adminOrganizationId: integer('admin_organization_id'),
+  // 웹스킨 관련
+  skinId: integer('skin_id'),
+  skinAppliedAt: timestamp('skin_applied_at'),
+  skinVersion: varchar('skin_version', { length: 20 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -191,6 +195,54 @@ export const siteCredentials = pgTable('site_credentials', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => [
   uniqueIndex('site_credentials_site_email_idx').on(table.siteId, table.email),
+]);
+
+// ===== web_skins (웹스킨 마스터 템플릿) =====
+export const webSkins = pgTable('web_skins', {
+  id: serial('id').primaryKey(),
+  productId: integer('product_id'),                              // Laravel products.id (nullable, 무료=null)
+  slug: varchar('slug', { length: 100 }).unique().notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  thumbnailUrl: varchar('thumbnail_url', { length: 500 }),
+  previewUrl: varchar('preview_url', { length: 500 }),
+  version: varchar('version', { length: 20 }).default('1.0.0'),
+  category: varchar('category', { length: 50 }),                 // beauty, clinic, cafe, general
+  isDefault: boolean('is_default').default(false),
+  isFree: boolean('is_free').default(true),
+  creatorId: integer('creator_id'),                              // Laravel members.id
+  fileCount: integer('file_count').default(0),
+  status: varchar('status', { length: 20 }).default('draft'),    // draft, active, archived
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// ===== web_skin_files (웹스킨 파일) =====
+export const webSkinFiles = pgTable('web_skin_files', {
+  id: serial('id').primaryKey(),
+  skinId: integer('skin_id').references(() => webSkins.id, { onDelete: 'cascade' }).notNull(),
+  filename: varchar('filename', { length: 255 }).notNull(),
+  fileType: varchar('file_type', { length: 20 }).notNull(),      // html, css, js
+  content: text('content'),                                       // 파일 내용 (텍스트)
+  fileSize: integer('file_size').default(0),
+  isEntry: boolean('is_entry').default(false),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('web_skin_files_skin_filename_idx').on(table.skinId, table.filename),
+]);
+
+// ===== org_skin_purchases (조직별 스킨 구매 내역) =====
+export const orgSkinPurchases = pgTable('org_skin_purchases', {
+  id: serial('id').primaryKey(),
+  organizationId: integer('organization_id').notNull(),           // Laravel organizations.id
+  skinId: integer('skin_id').references(() => webSkins.id, { onDelete: 'cascade' }).notNull(),
+  orderId: integer('order_id'),                                   // Laravel orders.id
+  purchasedAt: timestamp('purchased_at').defaultNow(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('org_skin_purchases_org_skin_idx').on(table.organizationId, table.skinId),
 ]);
 
 // ===== site_files (회원 임대 홈페이지 파일 저장 - 카페24 방식) =====
