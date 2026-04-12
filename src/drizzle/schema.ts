@@ -245,6 +245,41 @@ export const orgSkinPurchases = pgTable('org_skin_purchases', {
   uniqueIndex('org_skin_purchases_org_skin_idx').on(table.organizationId, table.skinId),
 ]);
 
+// ===== banner_areas (배너 영역/그룹) =====
+export const bannerAreas = pgTable('banner_areas', {
+  id: serial('id').primaryKey(),
+  siteId: uuid('site_id').notNull().references(() => sites.id, { onDelete: 'cascade' }),
+  areaId: varchar('area_id', { length: 100 }).notNull(),
+  areaName: varchar('area_name', { length: 255 }).notNull(),
+  areaDesc: text('area_desc'),
+  displayType: varchar('display_type', { length: 50 }).default('slide'),
+  sortOrder: integer('sort_order').default(0),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('banner_areas_site_area_idx').on(table.siteId, table.areaId),
+]);
+
+// ===== banner_items (개별 배너) =====
+export const bannerItems = pgTable('banner_items', {
+  id: serial('id').primaryKey(),
+  areaId: integer('area_id').notNull().references(() => bannerAreas.id, { onDelete: 'cascade' }),
+  num: integer('num').notNull(),
+  title: varchar('title', { length: 255 }),
+  imgUrl: text('img_url'),
+  videoUrl: text('video_url'),
+  linkUrl: text('link_url'),
+  linkTarget: varchar('link_target', { length: 20 }).default('_self'),
+  textContent: text('text_content'),
+  htmlContent: text('html_content'),
+  displayType: varchar('display_type', { length: 50 }),
+  sortOrder: integer('sort_order').default(0),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // ===== site_files (회원 임대 홈페이지 파일 저장 - 카페24 방식) =====
 export const siteFiles = pgTable('site_files', {
   id: serial('id').primaryKey(),

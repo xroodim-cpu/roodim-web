@@ -1,5 +1,5 @@
 import { db } from './db';
-import { sites, siteConfigs, siteSections, siteContents, siteMenuItems, siteFiles } from '@/drizzle/schema';
+import { sites, siteConfigs, siteSections, siteContents, siteMenuItems, siteFiles, webSkinFiles } from '@/drizzle/schema';
 import { eq, and, asc, desc } from 'drizzle-orm';
 
 /**
@@ -99,17 +99,55 @@ export async function getSiteFileList(siteId: string) {
 }
 
 /**
- * 사이트의 특정 파일 조회
+ * 사이트의 특정 파일 조회 (site_files 우선, 없으면 web_skin_files fallback)
  */
 export async function getSiteFile(siteId: string, filename: string) {
-  const result = await db.select()
+  // 1. site_files에서 먼저 검색 (커스텀 수정된 파일)
+  const siteFile = await db.select()
     .from(siteFiles)
     .where(and(
       eq(siteFiles.siteId, siteId),
       eq(siteFiles.filename, filename)
     ))
     .limit(1);
-  return result[0] || null;
+
+  if (siteFile[0]) return siteFile[0];
+
+  // 2. 없으면 sites.skin_id → web_skin_files에서 fallback
+  const site = await db.select({ skinId: sites.skinId })
+    .from(sites)
+    .where(eq(sites.id, siteId))
+    .limit(1);
+
+  const skinId = site[0]?.skinId;
+  if (!skinId) return null;
+
+  const skinFile = await db.select()
+    .from(webSkinFiles)
+    .where(and(
+      eq(webSkinFiles.skinId, skinId),
+      eq(webSkinFiles.filename, filename)
+    ))
+    .limit(1);
+
+  if (!skinFile[0]) return null;
+
+  // web_skin_files를 site_files와 동일한 형태로 반환
+  return {
+    id: skinFile[0].id,
+    siteId: siteId,
+    filename: skinFile[0].filename,
+    filePath: null,
+    fileType: skinFile[0].fileType,
+    content: skinFile[0].content,
+    blobUrl: null,
+    fileSize: skinFile[0].fileSize,
+    isEntry: skinFile[0].isEntry,
+    sortOrder: skinFile[0].sortOrder,
+    createdAt: skinFile[0].createdAt,
+    updatedAt: skinFile[0].updatedAt,
+    _fromSkin: true, // 스킨 파일임을 표시
+  };
 }
 
 /**
@@ -121,4 +159,12 @@ export async function getSiteFileById(fileId: number) {
     .where(eq(siteFiles.id, fileId))
     .limit(1);
   return result[0] || null;
+}
+
+/**
+ * 사이트의 파일 내용 조회 (template-engine용 - site_files 우선, skin fallback)
+ */
+export async function getFileContent(siteId: string, filename: string): Promise<string | null> {
+  const file = await getSiteFile(siteId, filename);
+  return file?.content || null;
 }

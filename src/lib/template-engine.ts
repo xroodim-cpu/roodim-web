@@ -1,6 +1,7 @@
 import { db } from './db';
-import { siteFiles, siteContents, siteConfigs, siteAdmins } from '@/drizzle/schema';
+import { siteFiles, siteContents, siteConfigs, siteAdmins, sites, webSkinFiles, bannerAreas, bannerItems } from '@/drizzle/schema';
 import { eq, and, asc } from 'drizzle-orm';
+import { getFileContent } from './site';
 
 interface TemplateContext {
   siteId: string;
@@ -19,16 +20,9 @@ export async function renderSiteFile(
   slug: string,
   filename: string
 ): Promise<string | null> {
-  // 파일 로드
-  const file = await db.select()
-    .from(siteFiles)
-    .where(and(
-      eq(siteFiles.siteId, siteId),
-      eq(siteFiles.filename, filename)
-    ))
-    .limit(1);
-
-  if (!file[0] || !file[0].content) return null;
+  // 파일 로드 (site_files 우선, 없으면 web_skin_files fallback)
+  const content = await getFileContent(siteId, filename);
+  if (!content) return null;
 
   // 설정 로드
   const configRows = await db.select()
@@ -42,7 +36,7 @@ export async function renderSiteFile(
 
   const ctx: TemplateContext = { siteId, slug, configs };
 
-  let html = file[0].content;
+  let html = content;
 
   // 1. include 처리 (최대 3 depth)
   html = await processIncludes(siteId, html, 0);
@@ -50,10 +44,13 @@ export async function renderSiteFile(
   // 2. 직원 루프 처리
   html = await processStaffLoop(siteId, html);
 
-  // 3. 치환코드 적용
+  // 3. 배너 영역 치환코드 처리
+  html = await processBannerAreas(siteId, html);
+
+  // 4. 치환코드 적용
   html = await applyVariables(ctx, html);
 
-  // 4. <base> 태그 삽입 (상대 경로 에셋 해결)
+  // 5. <base> 태그 삽입 (상대 경로 에셋 해결)
   if (html.includes('<head>')) {
     html = html.replace('<head>', `<head>\n    <base href="/${slug}/">`);
   } else if (html.includes('<HEAD>')) {
@@ -74,15 +71,10 @@ async function processIncludes(siteId: string, html: string, depth: number): Pro
 
   for (const match of matches) {
     const [fullMatch, includeFilename] = match;
-    const includeFile = await db.select({ content: siteFiles.content })
-      .from(siteFiles)
-      .where(and(
-        eq(siteFiles.siteId, siteId),
-        eq(siteFiles.filename, includeFilename)
-      ))
-      .limit(1);
+    // site_files 우선, 없으면 web_skin_files fallback
+    const fileContent = await getFileContent(siteId, includeFilename);
 
-    let replacement = includeFile[0]?.content || `<!-- include not found: ${includeFilename} -->`;
+    let replacement = fileContent || `<!-- include not found: ${includeFilename} -->`;
     replacement = await processIncludes(siteId, replacement, depth + 1);
     html = html.replace(fullMatch, replacement);
   }
@@ -190,6 +182,137 @@ async function applyVariables(ctx: TemplateContext, html: string): Promise<strin
 }
 
 /**
+ * 배너 영역 치환코드 처리
+ * HTML에서 <div class="roo-banner-area" area_id="..."> 영역을 감지하고
+ * 해당 영역의 배너 데이터로 치환코드를 적용
+ */
+async function processBannerAreas(siteId: string, html: string): Promise<string> {
+  // 1. area_id 속성이 있는 모든 배너 영역 감지
+  const areaIdRegex = /area_id="([^"]+)"/g;
+  const areaIds: string[] = [];
+  let areaMatch;
+  while ((areaMatch = areaIdRegex.exec(html)) !== null) {
+    if (!areaIds.includes(areaMatch[1])) {
+      areaIds.push(areaMatch[1]);
+    }
+  }
+
+  if (areaIds.length === 0) {
+    // area_id 없어도 배너 루프가 있을 수 있으므로 전역 처리
+    return processBannerLoops(siteId, html, null);
+  }
+
+  // 2. 각 area_id별로 배너 데이터 조회 및 치환
+  for (const areaId of areaIds) {
+    const area = await db.select()
+      .from(bannerAreas)
+      .where(and(
+        eq(bannerAreas.siteId, siteId),
+        eq(bannerAreas.areaId, areaId),
+        eq(bannerAreas.isActive, true)
+      ))
+      .limit(1);
+
+    if (!area[0]) continue;
+
+    const items = await db.select()
+      .from(bannerItems)
+      .where(and(
+        eq(bannerItems.areaId, area[0].id),
+        eq(bannerItems.isActive, true)
+      ))
+      .orderBy(asc(bannerItems.sortOrder), asc(bannerItems.num));
+
+    // 영역 메타 치환
+    html = html.replace(new RegExp(`(area_id="${areaId}"[^>]*>)([\\s\\S]*?)(?=<div class="roo-banner-area"|$)`, 'g'),
+      (fullMatch) => {
+        let result = fullMatch;
+
+        // 영역 메타 치환코드
+        result = result.replace(/\{#areaName\}/g, area[0].areaName || '');
+        result = result.replace(/\{#areaDesc\}/g, area[0].areaDesc || '');
+        result = result.replace(/\{#areaDisplayType\}/g, area[0].displayType || 'slide');
+
+        // 개별 배너 번호 기반 치환코드: {#img_1}, {#text_1}, {#link_1}, {#video_1}, {#target_1}
+        for (const item of items) {
+          const n = item.num;
+          result = result.replace(new RegExp(`\\{#img_${n}\\}`, 'g'), item.imgUrl || '');
+          result = result.replace(new RegExp(`\\{#text_${n}\\}`, 'g'), item.textContent || '');
+          result = result.replace(new RegExp(`\\{#link_${n}\\}`, 'g'), item.linkUrl || '');
+          result = result.replace(new RegExp(`\\{#video_${n}\\}`, 'g'), item.videoUrl || '');
+          result = result.replace(new RegExp(`\\{#target_${n}\\}`, 'g'), item.linkTarget || '_self');
+          result = result.replace(new RegExp(`\\{#title_${n}\\}`, 'g'), item.title || '');
+          result = result.replace(new RegExp(`\\{#html_${n}\\}`, 'g'), item.htmlContent || '');
+
+          // {#img_N_or_video_N} — 이미지 우선, 없으면 비디오
+          const mediaRegex = new RegExp(`\\{#img_${n}_or_video_${n}\\}`, 'g');
+          result = result.replace(mediaRegex, () => {
+            if (item.imgUrl) return `<img src="${item.imgUrl}" alt="${item.title || ''}" loading="lazy">`;
+            if (item.videoUrl) return `<video src="${item.videoUrl}" autoplay muted loop playsinline></video>`;
+            return '';
+          });
+        }
+
+        return result;
+      }
+    );
+
+    // 배너 루프 처리
+    html = await processBannerLoops(siteId, html, items);
+  }
+
+  return html;
+}
+
+/**
+ * <!--@banner_loop-->...<!--@end_banner_loop--> 처리
+ */
+async function processBannerLoops(
+  siteId: string,
+  html: string,
+  items: Array<{
+    num: number; title: string | null; imgUrl: string | null;
+    videoUrl: string | null; linkUrl: string | null; linkTarget: string | null;
+    textContent: string | null; htmlContent: string | null; displayType: string | null;
+  }> | null
+): Promise<string> {
+  const loopRegex = /<!--@banner_loop-->([\s\S]*?)<!--@end_banner_loop-->/g;
+  let match;
+  let result = html;
+
+  while ((match = loopRegex.exec(html)) !== null) {
+    const [fullMatch, template] = match;
+
+    if (!items || items.length === 0) {
+      result = result.replace(fullMatch, '<!-- no banner data -->');
+      continue;
+    }
+
+    const rendered = items.map(item => {
+      return template
+        .replace(/\{#img\}/g, item.imgUrl || '')
+        .replace(/\{#text\}/g, item.textContent || '')
+        .replace(/\{#link\}/g, item.linkUrl || '')
+        .replace(/\{#video\}/g, item.videoUrl || '')
+        .replace(/\{#target\}/g, item.linkTarget || '_self')
+        .replace(/\{#title\}/g, item.title || '')
+        .replace(/\{#html\}/g, item.htmlContent || '')
+        .replace(/\{#num\}/g, String(item.num))
+        .replace(/\{#displayType\}/g, item.displayType || '')
+        .replace(/\{#img_or_video\}/g, () => {
+          if (item.imgUrl) return `<img src="${item.imgUrl}" alt="${item.title || ''}" loading="lazy">`;
+          if (item.videoUrl) return `<video src="${item.videoUrl}" autoplay muted loop playsinline></video>`;
+          return '';
+        });
+    }).join('\n');
+
+    result = result.replace(fullMatch, rendered);
+  }
+
+  return result;
+}
+
+/**
  * 치환코드 목록 반환 (에디터에서 사용)
  */
 export function getAvailableVariables(): { code: string; description: string; category: string }[] {
@@ -221,5 +344,22 @@ export function getAvailableVariables(): { code: string; description: string; ca
     // 사이트
     { code: '{{SITE_URL}}', description: '사이트 기본 경로', category: '사이트' },
     { code: '{{SLUG}}', description: '사이트 슬러그', category: '사이트' },
+    // 배너 치환코드
+    { code: '{#img_N}', description: '배너 N번 이미지 URL', category: '배너' },
+    { code: '{#text_N}', description: '배너 N번 텍스트', category: '배너' },
+    { code: '{#link_N}', description: '배너 N번 링크 URL', category: '배너' },
+    { code: '{#video_N}', description: '배너 N번 동영상 URL', category: '배너' },
+    { code: '{#target_N}', description: '배너 N번 링크 타겟 (_blank/_self)', category: '배너' },
+    { code: '{#title_N}', description: '배너 N번 제목', category: '배너' },
+    { code: '{#img_N_or_video_N}', description: '이미지/동영상 자동 태그', category: '배너' },
+    { code: '{#areaName}', description: '배너 영역 이름', category: '배너' },
+    { code: '{#areaDesc}', description: '배너 영역 설명', category: '배너' },
+    { code: '<!--@banner_loop-->', description: '배너 루프 시작', category: '배너루프' },
+    { code: '<!--@end_banner_loop-->', description: '배너 루프 끝', category: '배너루프' },
+    { code: '{#img}', description: '현재 배너 이미지 (루프 내)', category: '배너루프' },
+    { code: '{#text}', description: '현재 배너 텍스트 (루프 내)', category: '배너루프' },
+    { code: '{#link}', description: '현재 배너 링크 (루프 내)', category: '배너루프' },
+    { code: '{#title}', description: '현재 배너 제목 (루프 내)', category: '배너루프' },
+    { code: '{#num}', description: '현재 배너 번호 (루프 내)', category: '배너루프' },
   ];
 }
