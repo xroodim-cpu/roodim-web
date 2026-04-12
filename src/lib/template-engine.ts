@@ -53,6 +53,13 @@ export async function renderSiteFile(
   // 3. 치환코드 적용
   html = await applyVariables(ctx, html);
 
+  // 4. <base> 태그 삽입 (상대 경로 에셋 해결)
+  if (html.includes('<head>')) {
+    html = html.replace('<head>', `<head>\n    <base href="/${slug}/">`);
+  } else if (html.includes('<HEAD>')) {
+    html = html.replace('<HEAD>', `<HEAD>\n    <base href="/${slug}/">`);
+  }
+
   return html;
 }
 
