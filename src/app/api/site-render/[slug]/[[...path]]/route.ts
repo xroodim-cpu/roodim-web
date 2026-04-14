@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSiteBySlug, getSiteFile } from '@/lib/site';
 import { renderSiteFile } from '@/lib/template-engine';
+import { db } from '@/lib/db';
+import { webSkins } from '@/drizzle/schema';
+import { eq } from 'drizzle-orm';
 
 interface RouteParams {
   params: Promise<{ slug: string; path?: string[] }>;
 }
 
 /**
- * 파일 기반 사이트 (standalone) 서빙
+ * 파일 기반 사이트 서빙 (standalone + 커스텀 스킨 사용 사이트)
  * CSS/JS/이미지 등 에셋도 여기서 처리
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -15,7 +18,21 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const pathStr = path?.join('/') || '';
 
   const site = await getSiteBySlug(slug);
-  if (!site || site.status !== 'active' || site.siteType !== 'standalone') {
+  if (!site || site.status !== 'active') {
+    return new NextResponse('Not Found', { status: 404 });
+  }
+  // standalone 사이트 + 커스텀(비기본) 스킨을 사용하는 사이트만 파일 기반 렌더링 허용
+  // 그 외(기본 스킨 사용 partner/rental/creator)는 섹션 기반 /{slug} 라우트를 사용
+  const isStandalone = site.siteType === 'standalone';
+  let hasCustomSkin = false;
+  if (site.skinId != null) {
+    const skinRows = await db.select({ isDefault: webSkins.isDefault })
+      .from(webSkins)
+      .where(eq(webSkins.id, site.skinId))
+      .limit(1);
+    hasCustomSkin = skinRows[0] ? !skinRows[0].isDefault : false;
+  }
+  if (!isStandalone && !hasCustomSkin) {
     return new NextResponse('Not Found', { status: 404 });
   }
 
