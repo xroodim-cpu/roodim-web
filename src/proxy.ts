@@ -7,9 +7,9 @@ const domainCache = new Map<string, { slug: string; siteType: string; useSkinRen
 const slugTypeCache = new Map<string, { siteType: string; useSkinRender: boolean; expires: number }>();
 const CACHE_TTL = 60 * 1000; // 1 minute
 
-// Shared postgres client for proxy
+// Shared postgres client for proxy — 동시 rewrite 요청을 버틸 수 있도록 max 상향
 const sql = postgres(process.env.DATABASE_URL!, {
-  max: 3,
+  max: 10,
   idle_timeout: 20,
   connect_timeout: 10,
 });

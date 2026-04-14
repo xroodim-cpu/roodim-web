@@ -50,11 +50,28 @@ export async function renderSiteFile(
   // 4. 치환코드 적용
   html = await applyVariables(ctx, html);
 
-  // 5. <base> 태그 삽입 (상대 경로 에셋 해결)
-  if (html.includes('<head>')) {
-    html = html.replace('<head>', `<head>\n    <base href="/${slug}/">`);
-  } else if (html.includes('<HEAD>')) {
-    html = html.replace('<HEAD>', `<HEAD>\n    <base href="/${slug}/">`);
+  // 5. <head> 자동 주입 (base 태그 + style.css fallback)
+  // 목적:
+  //  - <base> : 상대경로 에셋 해결 (이미지/링크 등)
+  //  - style.css 자동 link: 스킨 HTML 템플릿이 CSS 링크를 누락해도 동작 보장
+  //    (브랜드온도 스킨 사례: web_skin_files.style.css 는 있지만 index.html 에
+  //     <link rel="stylesheet"> 태그가 빠져있어 화면이 무스타일로 나오던 문제)
+  const needsBase = !/<base\s/i.test(html);
+  const alreadyLinksLocalCss = /<link[^>]*rel=["']?stylesheet[^>]*href=["']?(?!https?:|\/\/)[^"'>]*\.css/i.test(html);
+
+  let headInjection = '';
+  if (needsBase) {
+    headInjection += `\n    <base href="/${slug}/">`;
+  }
+  if (!alreadyLinksLocalCss) {
+    // style.css 가 실제 web_skin_files / site_files 에 존재할 때만 주입
+    const cssFile = await getFileContent(siteId, 'style.css');
+    if (cssFile) {
+      headInjection += `\n    <link rel="stylesheet" href="style.css">`;
+    }
+  }
+  if (headInjection) {
+    html = html.replace(/<head(\s[^>]*)?>/i, (m) => `${m}${headInjection}`);
   }
 
   return html;

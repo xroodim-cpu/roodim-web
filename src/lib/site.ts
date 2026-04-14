@@ -1,6 +1,6 @@
 import { db } from './db';
-import { sites, siteConfigs, siteSections, siteContents, siteMenuItems, siteFiles, webSkinFiles } from '@/drizzle/schema';
-import { eq, and, asc, desc } from 'drizzle-orm';
+import { sites, siteConfigs, siteSections, siteContents, siteMenuItems, siteFiles } from '@/drizzle/schema';
+import { eq, and, asc, desc, sql as sqlRaw } from 'drizzle-orm';
 
 /**
  * slug로 사이트 조회
@@ -100,53 +100,51 @@ export async function getSiteFileList(siteId: string) {
 
 /**
  * 사이트의 특정 파일 조회 (site_files 우선, 없으면 web_skin_files fallback)
+ *
+ * 성능: site_files + sites + web_skin_files 를 단일 LEFT JOIN 으로 합쳐
+ * 1회 왕복에 해결. 이전 구현은 순차 3쿼리였음.
  */
 export async function getSiteFile(siteId: string, filename: string) {
-  // 1. site_files에서 먼저 검색 (커스텀 수정된 파일)
-  const siteFile = await db.select()
-    .from(siteFiles)
-    .where(and(
-      eq(siteFiles.siteId, siteId),
-      eq(siteFiles.filename, filename)
-    ))
-    .limit(1);
+  const rows = await db.execute(sqlRaw`
+    SELECT
+      COALESCE(sf.id, wsf.id) AS id,
+      COALESCE(sf.filename, wsf.filename) AS filename,
+      sf.file_path AS file_path,
+      COALESCE(sf.file_type, wsf.file_type) AS file_type,
+      COALESCE(sf.content, wsf.content) AS content,
+      sf.blob_url AS blob_url,
+      COALESCE(sf.file_size, wsf.file_size) AS file_size,
+      COALESCE(sf.is_entry, wsf.is_entry) AS is_entry,
+      COALESCE(sf.sort_order, wsf.sort_order) AS sort_order,
+      COALESCE(sf.created_at, wsf.created_at) AS created_at,
+      COALESCE(sf.updated_at, wsf.updated_at) AS updated_at,
+      (sf.id IS NULL AND wsf.id IS NOT NULL) AS from_skin
+    FROM sites s
+    LEFT JOIN site_files sf
+      ON sf.site_id = s.id AND sf.filename = ${filename}
+    LEFT JOIN web_skin_files wsf
+      ON wsf.skin_id = s.skin_id AND wsf.filename = ${filename}
+    WHERE s.id = ${siteId}
+    LIMIT 1
+  `);
 
-  if (siteFile[0]) return siteFile[0];
+  const row = (rows as unknown as Array<Record<string, unknown>>)[0];
+  if (!row || row.id == null) return null;
 
-  // 2. 없으면 sites.skin_id → web_skin_files에서 fallback
-  const site = await db.select({ skinId: sites.skinId })
-    .from(sites)
-    .where(eq(sites.id, siteId))
-    .limit(1);
-
-  const skinId = site[0]?.skinId;
-  if (!skinId) return null;
-
-  const skinFile = await db.select()
-    .from(webSkinFiles)
-    .where(and(
-      eq(webSkinFiles.skinId, skinId),
-      eq(webSkinFiles.filename, filename)
-    ))
-    .limit(1);
-
-  if (!skinFile[0]) return null;
-
-  // web_skin_files를 site_files와 동일한 형태로 반환
   return {
-    id: skinFile[0].id,
-    siteId: siteId,
-    filename: skinFile[0].filename,
-    filePath: null,
-    fileType: skinFile[0].fileType,
-    content: skinFile[0].content,
-    blobUrl: null,
-    fileSize: skinFile[0].fileSize,
-    isEntry: skinFile[0].isEntry,
-    sortOrder: skinFile[0].sortOrder,
-    createdAt: skinFile[0].createdAt,
-    updatedAt: skinFile[0].updatedAt,
-    _fromSkin: true, // 스킨 파일임을 표시
+    id: row.id as number,
+    siteId,
+    filename: row.filename as string,
+    filePath: (row.file_path as string | null) ?? null,
+    fileType: row.file_type as string,
+    content: (row.content as string | null) ?? null,
+    blobUrl: (row.blob_url as string | null) ?? null,
+    fileSize: (row.file_size as number | null) ?? null,
+    isEntry: Boolean(row.is_entry),
+    sortOrder: (row.sort_order as number | null) ?? 0,
+    createdAt: row.created_at as Date | null,
+    updatedAt: row.updated_at as Date | null,
+    _fromSkin: Boolean(row.from_skin),
   };
 }
 

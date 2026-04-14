@@ -15,13 +15,15 @@ export default async function SiteLayout({ children, params }: LayoutProps) {
   const site = await getSiteBySlug(slug);
   if (!site || site.status !== 'active') notFound();
 
-  const configs = await getAllSiteConfigs(site.id);
+  // 4개 쿼리를 병렬 실행 (직렬이면 4xRTT, 병렬이면 1xRTT)
+  const [configs, menuItems, bottomItems] = await Promise.all([
+    getAllSiteConfigs(site.id),
+    getMenuItems(site.id, 'menubar'),
+    getMenuItems(site.id, 'bottom'),
+  ]);
   const base = configs['base'] || {};
   const design = configs['design'] || {};
   const headerFooter = configs['headerfooter'] || {};
-
-  const menuItems = await getMenuItems(site.id, 'menubar');
-  const bottomItems = await getMenuItems(site.id, 'bottom');
 
   return (
     <div

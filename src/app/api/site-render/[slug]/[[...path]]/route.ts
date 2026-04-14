@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSiteBySlug, getSiteFile } from '@/lib/site';
 import { renderSiteFile } from '@/lib/template-engine';
-import { db } from '@/lib/db';
-import { webSkins } from '@/drizzle/schema';
-import { eq } from 'drizzle-orm';
 
 interface RouteParams {
   params: Promise<{ slug: string; path?: string[] }>;
@@ -12,6 +9,9 @@ interface RouteParams {
 /**
  * 파일 기반 사이트 서빙 (standalone + 커스텀 스킨 사용 사이트)
  * CSS/JS/이미지 등 에셋도 여기서 처리
+ *
+ * 권한/허용 판정은 이미 src/proxy.ts 에서 수행된 후 rewrite로 진입하므로
+ * 여기서는 useSkinRender 재검증을 하지 않는다 (쿼리 1건 절감).
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { slug, path } = await params;
@@ -19,20 +19,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   const site = await getSiteBySlug(slug);
   if (!site || site.status !== 'active') {
-    return new NextResponse('Not Found', { status: 404 });
-  }
-  // standalone 사이트 + 커스텀(비기본) 스킨을 사용하는 사이트만 파일 기반 렌더링 허용
-  // 그 외(기본 스킨 사용 partner/rental/creator)는 섹션 기반 /{slug} 라우트를 사용
-  const isStandalone = site.siteType === 'standalone';
-  let hasCustomSkin = false;
-  if (site.skinId != null) {
-    const skinRows = await db.select({ isDefault: webSkins.isDefault })
-      .from(webSkins)
-      .where(eq(webSkins.id, site.skinId))
-      .limit(1);
-    hasCustomSkin = skinRows[0] ? !skinRows[0].isDefault : false;
-  }
-  if (!isStandalone && !hasCustomSkin) {
     return new NextResponse('Not Found', { status: 404 });
   }
 
@@ -51,18 +37,22 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   // 파일 조회
   const file = await getSiteFile(site.id, filename);
   if (!file) {
+    // Vercel 로그에서 누락 추적
+    console.warn('[site-render][404]', { slug, siteId: site.id, filename });
     return new NextResponse('Not Found', { status: 404 });
   }
 
-  // CSS 파일
-  if (file.fileType === 'css' && file.content) {
+  // CSS 파일 — fileType 뿐 아니라 확장자로도 감지 (저장 시 fileType 정규화 불일치 방어)
+  const isCss = file.fileType === 'css' || /\.css$/i.test(filename);
+  if (isCss && file.content) {
     return new NextResponse(file.content, {
       headers: { 'Content-Type': 'text/css; charset=utf-8', 'Cache-Control': 'public, max-age=300' },
     });
   }
 
-  // JS 파일
-  if (file.fileType === 'js' && file.content) {
+  // JS 파일 — 동일한 이중 감지
+  const isJs = file.fileType === 'js' || /\.m?js$/i.test(filename);
+  if (isJs && file.content) {
     return new NextResponse(file.content, {
       headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=300' },
     });

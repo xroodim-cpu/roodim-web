@@ -32,17 +32,24 @@ export default async function SitePage({ params }: PageProps) {
   const site = await getSiteBySlug(slug);
   if (!site || site.status !== 'active') notFound();
 
-  const configs = await getAllSiteConfigs(site.id);
-  const sections = await getActiveSections(site.id);
+  // configs + sections 병렬
+  const [configs, sections] = await Promise.all([
+    getAllSiteConfigs(site.id),
+    getActiveSections(site.id),
+  ]);
 
-  // 섹션별 콘텐츠 미리 로드
+  // 섹션별 콘텐츠 병렬 로드 (기존 for-await 직렬 → Promise.all 병렬)
   const sectionData: Record<string, unknown[]> = {};
-  for (const section of sections) {
-    const contentType = sectionKeyToContentType(section.sectionKey);
-    if (contentType) {
-      sectionData[section.sectionKey] = await getContentsByType(site.id, contentType, 10);
-    }
-  }
+  const sectionFetches = sections
+    .map((section) => {
+      const contentType = sectionKeyToContentType(section.sectionKey);
+      if (!contentType) return null;
+      return getContentsByType(site.id, contentType, 10).then((rows) => {
+        sectionData[section.sectionKey] = rows;
+      });
+    })
+    .filter((p): p is Promise<void> => p !== null);
+  await Promise.all(sectionFetches);
 
   const base = configs['base'] || {};
 
