@@ -15,6 +15,13 @@
       "when": 1775975325570,
       "tag": "0001_graceful_mother_askani",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776234576676,
+      "tag": "0002_stiff_vargas",
+      "breakpoints": true
     }
   ]
 }

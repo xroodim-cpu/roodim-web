@@ -1,0 +1,133 @@
+.reservations {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.header {
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 8px 0;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+
+.tableContainer {
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+
+  thead {
+    background-color: #f5f5f5;
+    border-bottom: 1px solid #e0e0e0;
+
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+  }
+
+  tbody {
+    tr {
+      border-bottom: 1px solid #e0e0e0;
+      transition: background-color 0.2s ease;
+
+      &:hover {
+        background-color: #fafafa;
+      }
+
+      td {
+        padding: 12px 16px;
+        color: #333;
+      }
+    }
+  }
+}
+
+.emptyCell {
+  text-align: center;
+  color: #999 !important;
+  padding: 40px 16px !important;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 12px;
+
+  &.pending {
+    background-color: #fff3cd;
+    color: #856404;
+  }
+
+  &.confirmed {
+    background-color: #d1ecf1;
+    color: #0c5460;
+  }
+
+  &.cancelled {
+    background-color: #f8d7da;
+    color: #721c24;
+  }
+
+  &.completed {
+    background-color: #d4edda;
+    color: #155724;
+  }
+}
+
+.actionBtn {
+  padding: 6px 12px;
+  background-color: transparent;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1a1a1a;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: #f5f5f5;
+    border-color: #cc222c;
+    color: #cc222c;
+  }
+}
+
+@media (max-width: 768px) {
+  .reservations {
+    gap: 16px;
+  }
+
+  .table {
+    font-size: 12px;
+
+    thead th {
+      padding: 10px 12px;
+    }
+
+    tbody td {
+      padding: 10px 12px;
+    }
+  }
+}

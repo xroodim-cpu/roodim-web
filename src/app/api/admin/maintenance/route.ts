@@ -1,63 +1,109 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { maintenanceRequests } from '@/drizzle/schema';
-import { eq, and, desc, sql } from 'drizzle-orm';
-import { verifyAdminAccess } from '@/lib/admin-session';
+import { sites, maintenanceRequests } from '@/drizzle/schema';
+import { eq } from 'drizzle-orm';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = request.nextUrl;
-  const slug = searchParams.get('slug');
-  if (!slug) return NextResponse.json({ error: 'slug is required' }, { status: 400 });
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const slug = searchParams.get('slug');
+    const status = searchParams.get('status');
 
-  const session = await verifyAdminAccess(slug);
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!slug) {
+      return NextResponse.json(
+        { error: 'slug parameter is required' },
+        { status: 400 }
+      );
+    }
 
-  const status = searchParams.get('status');
+    // 사이트 조회
+    const site = await db.query.sites.findFirst({
+      where: eq(sites.slug, slug),
+    });
 
-  const conditions = status
-    ? and(
-        eq(maintenanceRequests.siteId, session.site_id),
-        eq(maintenanceRequests.status, status as 'pending' | 'reviewing' | 'working' | 'done' | 'cancelled'),
-      )
-    : eq(maintenanceRequests.siteId, session.site_id);
+    if (!site) {
+      return NextResponse.json(
+        { error: 'Site not found' },
+        { status: 404 }
+      );
+    }
 
-  const rows = await db
-    .select()
-    .from(maintenanceRequests)
-    .where(conditions)
-    .orderBy(desc(maintenanceRequests.createdAt));
+    // 유지보수 요청 조회
+    let query = db
+      .select()
+      .from(maintenanceRequests)
+      .where(eq(maintenanceRequests.siteId, site.id));
 
-  return NextResponse.json({ ok: true, data: rows });
+    if (status && status !== 'all') {
+      query = db
+        .select()
+        .from(maintenanceRequests)
+        .where(
+          eq(maintenanceRequests.status, status as any)
+        );
+    }
+
+    const requests = await query;
+
+    return NextResponse.json({
+      requests,
+      total: requests.length,
+    });
+  } catch (error) {
+    console.error('[GET /api/admin/maintenance]', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
 }
 
-export async function POST(request: NextRequest) {
-  const { searchParams } = request.nextUrl;
-  const slug = searchParams.get('slug');
-  if (!slug) return NextResponse.json({ error: 'slug is required' }, { status: 400 });
+export async function POST(req: NextRequest) {
+  try {
+    const { slug, title, description, category, priority } = await req.json();
 
-  const session = await verifyAdminAccess(slug);
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!slug || !title) {
+      return NextResponse.json(
+        { error: 'slug and title are required' },
+        { status: 400 }
+      );
+    }
 
-  // 자동 번호 생성
-  const countResult = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(maintenanceRequests)
-    .where(eq(maintenanceRequests.siteId, session.site_id));
+    // 사이트 조회
+    const site = await db.query.sites.findFirst({
+      where: eq(sites.slug, slug),
+    });
 
-  const nextNum = (countResult[0]?.count ?? 0) + 1;
+    if (!site) {
+      return NextResponse.json(
+        { error: 'Site not found' },
+        { status: 404 }
+      );
+    }
 
-  const [row] = await db
-    .insert(maintenanceRequests)
-    .values({
-      siteId: session.site_id,
-      title: `유지보수 요청 #${nextNum}`,
-      description: '',
-      category: 'other',
-      priority: 'normal',
-      status: 'pending',
-      requestedBy: { name: session.name, role: session.role },
-    })
-    .returning();
+    // 유지보수 요청 생성
+    const result = await db
+      .insert(maintenanceRequests)
+      .values({
+        siteId: site.id,
+        title,
+        description: description || '',
+        category: category || 'other',
+        priority: priority || 'normal',
+        status: 'pending',
+        requestedBy: {},
+        attachments: [],
+      })
+      .returning();
 
-  return NextResponse.json({ ok: true, data: row });
+    return NextResponse.json({
+      request: result[0],
+    });
+  } catch (error) {
+    console.error('[POST /api/admin/maintenance]', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
 }

@@ -297,3 +297,73 @@ export const siteFiles = pgTable('site_files', {
 }, (table) => [
   uniqueIndex('site_files_site_filename_idx').on(table.siteId, table.filename),
 ]);
+
+// ===== site_services (시술/상품) =====
+export const siteServices = pgTable('site_services', {
+  id: serial('id').primaryKey(),
+  siteId: uuid('site_id').notNull().references(() => sites.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  price: integer('price'),
+  category: varchar('category', { length: 100 }),
+  isActive: boolean('is_active').default(true).notNull(),
+  sortOrder: integer('sort_order').default(0).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('site_services_site_idx').on(table.siteId),
+]);
+
+// ===== site_info (사이트 기본정보) =====
+export const siteInfo = pgTable('site_info', {
+  id: serial('id').primaryKey(),
+  siteId: uuid('site_id').notNull().unique().references(() => sites.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 255 }),
+  description: text('description'),
+  phone: varchar('phone', { length: 20 }),
+  email: varchar('email', { length: 255 }),
+  address: varchar('address', { length: 500 }),
+  businessHours: jsonb('business_hours').default({}).notNull(),
+  servicesProvided: jsonb('services_provided').default([]).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// ===== workboards (협업 보드) =====
+export const workboards = pgTable('workboards', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  slug: varchar('slug', { length: 100 }).unique().notNull(),
+  ownerId: integer('owner_id'),  // Laravel members.id
+  organizationId: integer('organization_id'),  // Laravel organizations.id
+  visibility: varchar('visibility', { length: 20 }).default('private').notNull(),  // private, shared
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// ===== workboard_members (워크보드 멤버/초대) =====
+export const workboardMembers = pgTable('workboard_members', {
+  id: serial('id').primaryKey(),
+  workboardId: integer('workboard_id').notNull().references(() => workboards.id, { onDelete: 'cascade' }),
+  siteId: uuid('site_id').notNull().references(() => sites.id, { onDelete: 'cascade' }),
+  invitedAt: timestamp('invited_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('workboard_members_wb_site_idx').on(table.workboardId, table.siteId),
+]);
+
+// ===== roodim_sync_logs (동기화 로그) =====
+export const roodimSyncLogs = pgTable('roodim_sync_logs', {
+  id: serial('id').primaryKey(),
+  siteId: uuid('site_id').notNull().references(() => sites.id, { onDelete: 'cascade' }),
+  entityType: varchar('entity_type', { length: 50 }).notNull(),  // maintenance_request, message, etc
+  externalId: integer('external_id'),  // MySQL ID from roodim-link
+  action: varchar('action', { length: 20 }).notNull(),  // insert, update, delete
+  status: varchar('status', { length: 20 }).notNull(),  // pending, synced, failed
+  errorMessage: text('error_message'),
+  syncedAt: timestamp('synced_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('roodim_sync_logs_site_idx').on(table.siteId),
+  index('roodim_sync_logs_type_idx').on(table.entityType, table.status),
+]);
