@@ -10,6 +10,30 @@ interface TemplateContext {
 }
 
 /**
+ * 사용자 업로드 자산(로고/프로필 사진) URL 정규화.
+ *
+ * 배경: 레거시 사이트는 `site_configs.headerfooter.logo_url` 또는 `siteContents.thumbUrl` 에
+ * `/storage/user/2/logo/xxx.png` 같은 Laravel 서버의 루트 상대경로를 그대로 저장해 뒀다.
+ * Vercel 에 서빙되는 roodim-web 에서 이 경로를 그대로 쓰면:
+ *   - `<base href="/org-1/">` + strip-leading-slash 로 `org-1/storage/...` 가 되거나
+ *   - strip 안 하더라도 `https://roodim-web.vercel.app/storage/...` 로 요청돼 404
+ *
+ * 해결: `/storage/` 로 시작하는 경로는 `ADMIN_API_URL` (루딤 어드민 Laravel 서버) 로
+ * 프리픽스를 붙여 절대 URL 로 만든다. 이미 `http(s)://` 또는 `//` 로 시작하면 그대로.
+ */
+function resolveAssetUrl(value: string | null | undefined): string {
+  if (!value) return '';
+  const v = value.trim();
+  if (!v) return '';
+  if (/^https?:\/\//i.test(v) || v.startsWith('//')) return v;
+  if (v.startsWith('/storage/')) {
+    const base = (process.env.ADMIN_API_URL || '').replace(/\/$/, '');
+    if (base) return `${base}${v}`;
+  }
+  return v;
+}
+
+/**
  * 파일 기반 사이트의 HTML을 렌더링
  * 1. include 처리
  * 2. 직원 루프 처리
@@ -62,17 +86,26 @@ export async function renderSiteFile(
   //  - <link href="/xxx">, <script src="/xxx">, <img src="/xxx"> 등 로컬 루트 절대경로를
   //    상대경로로 치환해 <base href="/{slug}/"> 와 함께 서브폴더 안에서 정상 해석되게 함.
   //  - 프로토콜(`http://`, `https://`) 과 프로토콜 상대(`//`) 는 건드리지 않음.
+  //  - `/storage/`, `/_next/`, `/api/`, `/admin/`, `/favicon` 같은 서버 루트 절대경로는
+  //    strip 하지 않는다. 특히 `/storage/user/.../logo.png` 는 Laravel 서버의 실제 파일
+  //    경로이므로 Vercel 서브폴더로 재해석되면 404.
+  const isServerAbsolute = (path: string) =>
+    /^\/(storage|_next|api|admin|favicon)/i.test(path);
+  const stripLeadingSlash = (prefix: string, rest: string) => {
+    if (isServerAbsolute('/' + rest)) return `${prefix}"/${rest}"`;
+    return `${prefix}"${rest}"`;
+  };
   html = html.replace(
     /(<link\b[^>]*?\shref=)["']\/(?!\/)([^"']+)["']/gi,
-    (_m, prefix, rest) => `${prefix}"${rest}"`
+    (_m, prefix, rest) => stripLeadingSlash(prefix, rest)
   );
   html = html.replace(
     /(<(?:script|img|source|video|audio|iframe)\b[^>]*?\ssrc=)["']\/(?!\/)([^"']+)["']/gi,
-    (_m, prefix, rest) => `${prefix}"${rest}"`
+    (_m, prefix, rest) => stripLeadingSlash(prefix, rest)
   );
   html = html.replace(
     /(<a\b[^>]*?\shref=)["']\/(?!\/)([^"'#?][^"']*)["']/gi,
-    (_m, prefix, rest) => `${prefix}"${rest}"`
+    (_m, prefix, rest) => stripLeadingSlash(prefix, rest)
   );
 
   // 5. <head> 자동 주입 (base 태그 + style.css fallback)
@@ -154,7 +187,7 @@ async function processStaffLoop(siteId: string, html: string): Promise<string> {
   const rendered = staffList.map(staff => {
     const meta = (staff.metaJson || {}) as Record<string, string>;
     return template
-      .replace(/\{\{STAFF_PHOTO\}\}/g, staff.thumbUrl || '')
+      .replace(/\{\{STAFF_PHOTO\}\}/g, resolveAssetUrl(staff.thumbUrl))
       .replace(/\{\{STAFF_NAME\}\}/g, staff.title || '')
       .replace(/\{\{STAFF_POSITION\}\}/g, meta.position || '')
       .replace(/\{\{STAFF_EMAIL\}\}/g, meta.email || '')
@@ -201,13 +234,14 @@ async function applyVariables(ctx: TemplateContext, html: string): Promise<strin
     'PHONE': base.phone || headerfooter.phone || '',
     'EMAIL': base.email || headerfooter.email || '',
     'ADDRESS': base.address || headerfooter.address || '',
-    'LOGO_URL': base.logo_url || design.logo_url || '',
+    // 자산 URL: /storage/... 레거시 경로는 ADMIN_API_URL 로 정규화 (Laravel 서버로 직행)
+    'LOGO_URL': resolveAssetUrl(base.logo_url || headerfooter.logo_url || design.logo_url || ''),
     'BUSINESS_NUMBER': base.business_number || headerfooter.business_number || '',
     'COPYRIGHT': headerfooter.copyright || `© ${new Date().getFullYear()} ${base.site_name || ''}`,
 
     // 대표(Owner) 치환코드
     'OWNER_NAME': owner?.name || ownerMeta.name || '',
-    'OWNER_PHOTO': ownerProfile[0]?.thumbUrl || ownerMeta.photo || '',
+    'OWNER_PHOTO': resolveAssetUrl(ownerProfile[0]?.thumbUrl || ownerMeta.photo || ''),
     'OWNER_POSITION': ownerMeta.position || '',
     'OWNER_EMAIL': ownerMeta.email || '',
     'OWNER_PHONE': ownerMeta.phone || '',
