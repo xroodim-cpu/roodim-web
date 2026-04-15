@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { sites, maintenanceRequests } from '@/drizzle/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
@@ -29,21 +29,20 @@ export async function GET(req: NextRequest) {
     }
 
     // 유지보수 요청 조회
-    let query = db
-      .select()
-      .from(maintenanceRequests)
-      .where(eq(maintenanceRequests.siteId, site.id));
+    let whereConditions: any = eq(maintenanceRequests.siteId, site.id);
 
     if (status && status !== 'all') {
-      query = db
-        .select()
-        .from(maintenanceRequests)
-        .where(
-          eq(maintenanceRequests.status, status as any)
-        );
+      whereConditions = and(
+        eq(maintenanceRequests.siteId, site.id),
+        eq(maintenanceRequests.status, status as any)
+      );
     }
 
-    const requests = await query;
+    const requests = await db
+      .select()
+      .from(maintenanceRequests)
+      .where(whereConditions)
+      .orderBy((t) => t.createdAt);
 
     return NextResponse.json({
       requests,
