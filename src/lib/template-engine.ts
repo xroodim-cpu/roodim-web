@@ -74,6 +74,25 @@ export async function renderSiteFile(
   // 4. 치환코드 적용
   html = await applyVariables(ctx, html);
 
+  // 4.3. 빈 src 이미지 정리
+  // 배경: {{OWNER_PHOTO}}, {{LOGO_URL}}, {#img_N} 등이 DB 에 값이 없을 때 `src=""` 로
+  //       치환되는데, 모던 브라우저(Chrome 65+)는 `src=""` 에 대해 load/error 이벤트를
+  //       발화하지 않아 스킨 HTML 의 `onerror` 폴백이 작동하지 않고 "깨진 이미지" 아이콘이
+  //       표시된다.
+  // 조치: 치환 후 `src=""` 이거나 `src` 속성 자체가 없는 img 를 `.roo-empty` 마커 span 으로
+  //       교체한다. 이 마커는 상위 섹션의 `.rs:has([data-empty="1"]) { display: none }`
+  //       CSS 규칙과 연동되어 해당 섹션을 자연스럽게 숨겨준다.
+  html = html.replace(
+    /<img\b([^>]*?)\/?>/gi,
+    (match, attrs) => {
+      const srcMatch = attrs.match(/\ssrc=["']([^"']*)["']/i);
+      if (!srcMatch || !srcMatch[1].trim()) {
+        return '<span class="roo-empty" data-empty="1" hidden></span>';
+      }
+      return match;
+    }
+  );
+
   // 4.5. 루트 절대경로(/...) → 상대경로 정규화
   // 배경:
   //  - 기본스킨 시더(routes/web.php:391 seed-basic-skin)가 `<link rel="stylesheet" href="/style.css">`
