@@ -146,7 +146,9 @@ async function processStaffLoop(siteId: string, html: string): Promise<string> {
     .orderBy(asc(siteContents.sortOrder));
 
   if (staffList.length === 0) {
-    return html.replace(fullMatch, '<!-- no staff data -->');
+    // staff 데이터가 없으면 상위 section 을 숨기기 위한 마커 렌더링.
+    // style.css 에서 `.rs:has([data-empty="1"]) { display: none }` 으로 전체 섹션 숨김.
+    return html.replace(fullMatch, '<div class="roo-empty" data-empty="1" hidden></div>');
   }
 
   const rendered = staffList.map(staff => {
@@ -276,6 +278,12 @@ async function processBannerAreas(siteId: string, html: string): Promise<string>
       (fullMatch) => {
         let result = fullMatch;
 
+        // 빈 area 마커: items 가 0 이면 banner-area 태그에 data-empty="1" 을 주입해
+        // CSS 에서 상위 section 을 숨길 수 있게 한다 (`.rs:has([data-empty="1"]){display:none}`).
+        if (items.length === 0) {
+          result = result.replace(/(area_id="[^"]+"[^>]*?)(>)/, '$1 data-empty="1"$2');
+        }
+
         // 영역 메타 치환코드
         result = result.replace(/\{#areaName\}/g, area[0].areaName || '');
         result = result.replace(/\{#areaDesc\}/g, area[0].areaDesc || '');
@@ -324,6 +332,12 @@ async function processBannerAreas(siteId: string, html: string): Promise<string>
               });
           }).join('\n');
         });
+
+        // 빈 area 클린업 — items 배열이 비어있거나 해당 슬롯에 data 가 없으면
+        // 번호 기반 치환코드가 raw 문자열로 남는다. "{#img_3_or_video_3}" 같은 조합형을 먼저,
+        // 그 다음 단순 키를 지운다.
+        result = result.replace(/\{#img_(\d+)_or_video_\1\}/g, '');
+        result = result.replace(/\{#(img|text|link|video|target|title|html)_\d+\}/g, '');
 
         return result;
       }
