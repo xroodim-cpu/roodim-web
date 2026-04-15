@@ -65,8 +65,13 @@ export async function proxy(request: NextRequest) {
         const slug = rows[0].slug as string;
         const siteType = rows[0].site_type as string;
         const skinId = rows[0].skin_id as number | null;
-        const skinIsDefault = rows[0].skin_is_default as boolean;
-        const useSkinRender = siteType === 'standalone' || (skinId != null && !skinIsDefault);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const _skinIsDefault = rows[0].skin_is_default as boolean;
+        // 기본스킨도 파일 기반 렌더링 경로를 사용해 풀 템플릿(hero/features/packages/staff/gallery 등)을
+        // 그대로 보여준다. 이전에는 `!skinIsDefault` 조건으로 기본스킨을 (site)/[slug] 섹션 기반
+        // React 레이아웃으로 빠뜨렸는데, 기본스킨이 단순 플레이스홀더가 아니라 완전한 치환 템플릿을
+        // 포함하도록 리디자인된 이상, 모든 skinId 할당 사이트는 `/api/site-render/*` 로 흘려보낸다.
+        const useSkinRender = siteType === 'standalone' || skinId != null;
         domainCache.set(hostWithoutPort, { slug, siteType, useSkinRender, expires: Date.now() + CACHE_TTL });
 
         if (useSkinRender) {
@@ -119,8 +124,10 @@ export async function proxy(request: NextRequest) {
     if (rows.length > 0) {
       const siteType = rows[0].site_type as string;
       const skinId = rows[0].skin_id as number | null;
-      const skinIsDefault = rows[0].skin_is_default as boolean;
-      const useSkinRender = siteType === 'standalone' || (skinId != null && !skinIsDefault);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const _skinIsDefault = rows[0].skin_is_default as boolean;
+      // 기본스킨도 파일 기반 렌더링 경로를 사용 (위 커스텀 도메인 처리 주석 참조)
+      const useSkinRender = siteType === 'standalone' || skinId != null;
       slugTypeCache.set(slug, { siteType, useSkinRender, expires: Date.now() + CACHE_TTL });
 
       if (useSkinRender) {
