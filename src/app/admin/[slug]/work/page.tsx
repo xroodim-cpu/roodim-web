@@ -18,6 +18,7 @@ export default function WorkPage({ params }: { params: Promise<{ slug: string }>
   const [slug, setSlug] = useState<string | null>(null);
   const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
@@ -31,15 +32,23 @@ export default function WorkPage({ params }: { params: Promise<{ slug: string }>
     if (!slug) return;
 
     async function fetchRequests() {
+      setLoading(true);
+      setError(null);
       try {
         const url = `/api/admin/maintenance?slug=${slug}`;
         const response = await fetch(url);
         if (response.ok) {
           const data = await response.json();
           setRequests(data.requests || []);
+        } else {
+          setError(`Failed to load work items (${response.status})`);
+          setRequests([]);
         }
-      } catch (error) {
-        console.error('Failed to fetch requests:', error);
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+        console.error('Failed to fetch requests:', errorMsg);
+        setError(`Failed to load work items: ${errorMsg}`);
+        setRequests([]);
       } finally {
         setLoading(false);
       }
@@ -101,7 +110,11 @@ export default function WorkPage({ params }: { params: Promise<{ slug: string }>
 
       {/* 요청 목록 */}
       <div className={styles.requestList}>
-        {loading ? (
+        {error ? (
+          <div style={{ padding: '20px', color: '#cc222c', textAlign: 'center', background: '#ffebee', borderRadius: '8px' }}>
+            ⚠️ {error}
+          </div>
+        ) : loading ? (
           <div className={styles.loading}>로딩 중...</div>
         ) : filteredRequests.length === 0 ? (
           <div className={styles.emptyState}>

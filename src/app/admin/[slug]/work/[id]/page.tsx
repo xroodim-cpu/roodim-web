@@ -31,8 +31,10 @@ export default function WorkDetailPage({
   const [workId, setWorkId] = useState<string | null>(null);
   const [request, setRequest] = useState<WorkRequest | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
 
   useEffect(() => {
     params.then(({ slug: paramSlug, id: paramId }) => {
@@ -45,14 +47,20 @@ export default function WorkDetailPage({
     if (!slug || !workId) return;
 
     async function fetchRequest() {
+      setLoading(true);
+      setError(null);
       try {
         const response = await fetch(`/api/admin/maintenance/${workId}?slug=${slug}`);
         if (response.ok) {
           const data = await response.json();
           setRequest(data.request);
+        } else {
+          setError(`Failed to load work item (${response.status})`);
         }
-      } catch (error) {
-        console.error('Failed to fetch request:', error);
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+        console.error('Failed to fetch request:', errorMsg);
+        setError(`Failed to load work item: ${errorMsg}`);
       } finally {
         setLoading(false);
       }
@@ -65,6 +73,7 @@ export default function WorkDetailPage({
     if (!newMessage.trim() || !slug || !workId) return;
 
     setSending(true);
+    setMessageError(null);
     try {
       const response = await fetch(`/api/admin/maintenance/${workId}/messages?slug=${slug}`, {
         method: 'POST',
@@ -84,9 +93,13 @@ export default function WorkDetailPage({
           });
         }
         setNewMessage('');
+      } else {
+        setMessageError(`Failed to send message (${response.status})`);
       }
-    } catch (error) {
-      console.error('Failed to send message:', error);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Failed to send message:', errorMsg);
+      setMessageError(`Failed to send: ${errorMsg}`);
     } finally {
       setSending(false);
     }
@@ -98,6 +111,10 @@ export default function WorkDetailPage({
 
   if (loading) {
     return <div className={styles.loading}>로딩 중...</div>;
+  }
+
+  if (error) {
+    return <div className={styles.error}>⚠️ {error}</div>;
   }
 
   if (!request) {
@@ -169,6 +186,11 @@ export default function WorkDetailPage({
         </div>
 
         <div className={styles.messageInput}>
+          {messageError && (
+            <div style={{ padding: '10px', color: '#cc222c', background: '#ffebee', borderRadius: '4px', fontSize: '13px' }}>
+              ⚠️ {messageError}
+            </div>
+          )}
           <textarea
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
