@@ -50,6 +50,31 @@ export async function renderSiteFile(
   // 4. 치환코드 적용
   html = await applyVariables(ctx, html);
 
+  // 4.5. 루트 절대경로(/...) → 상대경로 정규화
+  // 배경:
+  //  - 기본스킨 시더(routes/web.php:391 seed-basic-skin)가 `<link rel="stylesheet" href="/style.css">`
+  //    처럼 루트 절대경로로 저장해 왔음.
+  //  - roodim-web 은 slug 서브폴더 rewrite(/{slug}/...)로 파일을 서빙하기 때문에
+  //    브라우저가 `/style.css` 를 요청하면 루트 도메인으로 가 404 가 남.
+  //  - 사용자가 기본스킨을 "커스텀"해 clone 하면 이 깨진 HTML 을 그대로 상속받아
+  //    CSS/JS/이미지가 전부 깨지는 현상(= "커스텀한 기본스킨이 적용 안됨")이 발생.
+  // 조치:
+  //  - <link href="/xxx">, <script src="/xxx">, <img src="/xxx"> 등 로컬 루트 절대경로를
+  //    상대경로로 치환해 <base href="/{slug}/"> 와 함께 서브폴더 안에서 정상 해석되게 함.
+  //  - 프로토콜(`http://`, `https://`) 과 프로토콜 상대(`//`) 는 건드리지 않음.
+  html = html.replace(
+    /(<link\b[^>]*?\shref=)["']\/(?!\/)([^"']+)["']/gi,
+    (_m, prefix, rest) => `${prefix}"${rest}"`
+  );
+  html = html.replace(
+    /(<(?:script|img|source|video|audio|iframe)\b[^>]*?\ssrc=)["']\/(?!\/)([^"']+)["']/gi,
+    (_m, prefix, rest) => `${prefix}"${rest}"`
+  );
+  html = html.replace(
+    /(<a\b[^>]*?\shref=)["']\/(?!\/)([^"'#?][^"']*)["']/gi,
+    (_m, prefix, rest) => `${prefix}"${rest}"`
+  );
+
   // 5. <head> 자동 주입 (base 태그 + style.css fallback)
   // 목적:
   //  - <base> : 상대경로 에셋 해결 (이미지/링크 등)
