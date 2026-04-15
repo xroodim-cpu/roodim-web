@@ -244,7 +244,13 @@ async function processBannerAreas(siteId: string, html: string): Promise<string>
     return processBannerLoops(siteId, html, null);
   }
 
-  // 2. 각 area_id별로 배너 데이터 조회 및 치환
+  // 2. 각 area_id별로 배너 데이터 조회 및 치환 (area 범위 내에서만 치환)
+  // 배경:
+  //  - 과거 버전은 `processBannerLoops` 을 for-loop 외부에서 호출해, 서로 다른 영역이
+  //    `<!--@banner_loop-->` 를 각자 가지고 있을 때 첫 번째 영역 아이템이 모든 루프를
+  //    덮어씌우는 버그가 있었음.
+  //  - 이번 수정: 번호 기반 치환코드(`{#img_1}` 등) 와 `<!--@banner_loop-->` 모두
+  //    area 범위 안에서만 해당 area 의 items 로 치환되게 묶음.
   for (const areaId of areaIds) {
     const area = await db.select()
       .from(bannerAreas)
@@ -265,7 +271,7 @@ async function processBannerAreas(siteId: string, html: string): Promise<string>
       ))
       .orderBy(asc(bannerItems.sortOrder), asc(bannerItems.num));
 
-    // 영역 메타 치환
+    // 영역 메타 + 번호 기반 + 루프 — 모두 이 area 의 scope 안에서만 치환
     html = html.replace(new RegExp(`(area_id="${areaId}"[^>]*>)([\\s\\S]*?)(?=<div class="roo-banner-area"|$)`, 'g'),
       (fullMatch) => {
         let result = fullMatch;
@@ -295,13 +301,37 @@ async function processBannerAreas(siteId: string, html: string): Promise<string>
           });
         }
 
+        // 배너 루프 — area 범위 안에서만 처리
+        result = result.replace(/<!--@banner_loop-->([\s\S]*?)<!--@end_banner_loop-->/g, (loopMatch, template) => {
+          if (items.length === 0) {
+            return '<!-- no banner data -->';
+          }
+          return items.map(item => {
+            return template
+              .replace(/\{#img\}/g, item.imgUrl || '')
+              .replace(/\{#text\}/g, item.textContent || '')
+              .replace(/\{#link\}/g, item.linkUrl || '')
+              .replace(/\{#video\}/g, item.videoUrl || '')
+              .replace(/\{#target\}/g, item.linkTarget || '_self')
+              .replace(/\{#title\}/g, item.title || '')
+              .replace(/\{#html\}/g, item.htmlContent || '')
+              .replace(/\{#num\}/g, String(item.num))
+              .replace(/\{#displayType\}/g, item.displayType || '')
+              .replace(/\{#img_or_video\}/g, () => {
+                if (item.imgUrl) return `<img src="${item.imgUrl}" alt="${item.title || ''}" loading="lazy">`;
+                if (item.videoUrl) return `<video src="${item.videoUrl}" autoplay muted loop playsinline></video>`;
+                return '';
+              });
+          }).join('\n');
+        });
+
         return result;
       }
     );
-
-    // 배너 루프 처리
-    html = await processBannerLoops(siteId, html, items);
   }
+
+  // 3. area 바깥에 남아있는 orphan banner_loop 는 "no data" 로 정리
+  html = await processBannerLoops(siteId, html, null);
 
   return html;
 }
