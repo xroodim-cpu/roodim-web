@@ -253,6 +253,9 @@ async function processBannerAreas(siteId: string, html: string): Promise<string>
   //    덮어씌우는 버그가 있었음.
   //  - 이번 수정: 번호 기반 치환코드(`{#img_1}` 등) 와 `<!--@banner_loop-->` 모두
   //    area 범위 안에서만 해당 area 의 items 로 치환되게 묶음.
+  //  - 추가: `banner_areas` 테이블에 해당 `area_id` row 가 아예 없는 신규 사이트도
+  //    스킨이 numbered code / banner_loop 를 가지고 있을 수 있으므로, row 부재 시에도
+  //    "items=0 인 area" 로 간주해 동일한 정리 로직을 적용한다.
   for (const areaId of areaIds) {
     const area = await db.select()
       .from(bannerAreas)
@@ -263,31 +266,40 @@ async function processBannerAreas(siteId: string, html: string): Promise<string>
       ))
       .limit(1);
 
-    if (!area[0]) continue;
-
-    const items = await db.select()
-      .from(bannerItems)
-      .where(and(
-        eq(bannerItems.areaId, area[0].id),
-        eq(bannerItems.isActive, true)
-      ))
-      .orderBy(asc(bannerItems.sortOrder), asc(bannerItems.num));
+    // area row 가 없으면 items 도 자동으로 빈 배열
+    const items = area[0]
+      ? await db.select()
+          .from(bannerItems)
+          .where(and(
+            eq(bannerItems.areaId, area[0].id),
+            eq(bannerItems.isActive, true)
+          ))
+          .orderBy(asc(bannerItems.sortOrder), asc(bannerItems.num))
+      : [];
 
     // 영역 메타 + 번호 기반 + 루프 — 모두 이 area 의 scope 안에서만 치환
-    html = html.replace(new RegExp(`(area_id="${areaId}"[^>]*>)([\\s\\S]*?)(?=<div class="roo-banner-area"|$)`, 'g'),
+    // 주의: HTML 주석(`<!-- area_id="gallery" -->`) 안에 area_id 가 언급돼 있어도
+    //       실제 banner-area div 만 잡도록 `<div ... class="...roo-banner-area..." area_id="..">`
+    //       형태를 강제한다.
+    const areaRegex = new RegExp(
+      `(<div[^>]*roo-banner-area[^>]*area_id="${areaId}"[^>]*>)([\\s\\S]*?)(?=<div[^>]*roo-banner-area|$)`,
+      'g'
+    );
+    html = html.replace(areaRegex,
       (fullMatch) => {
         let result = fullMatch;
 
         // 빈 area 마커: items 가 0 이면 banner-area 태그에 data-empty="1" 을 주입해
         // CSS 에서 상위 section 을 숨길 수 있게 한다 (`.rs:has([data-empty="1"]){display:none}`).
         if (items.length === 0) {
-          result = result.replace(/(area_id="[^"]+"[^>]*?)(>)/, '$1 data-empty="1"$2');
+          // 첫 번째 `>` (= banner-area 여는 태그의 종료) 앞에 주입.
+          result = result.replace(/^(<div[^>]*?)(>)/, '$1 data-empty="1"$2');
         }
 
-        // 영역 메타 치환코드
-        result = result.replace(/\{#areaName\}/g, area[0].areaName || '');
-        result = result.replace(/\{#areaDesc\}/g, area[0].areaDesc || '');
-        result = result.replace(/\{#areaDisplayType\}/g, area[0].displayType || 'slide');
+        // 영역 메타 치환코드 (area row 부재 시 빈 문자열로 안전 기본)
+        result = result.replace(/\{#areaName\}/g, area[0]?.areaName || '');
+        result = result.replace(/\{#areaDesc\}/g, area[0]?.areaDesc || '');
+        result = result.replace(/\{#areaDisplayType\}/g, area[0]?.displayType || 'slide');
 
         // 개별 배너 번호 기반 치환코드: {#img_1}, {#text_1}, {#link_1}, {#video_1}, {#target_1}
         for (const item of items) {
