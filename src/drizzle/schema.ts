@@ -20,6 +20,9 @@ export const sites = pgTable('sites', {
   slug: varchar('slug', { length: 100 }).notNull().unique(),
   name: varchar('name', { length: 255 }).notNull(),
   customDomain: varchar('custom_domain', { length: 253 }),
+  /** Vercel 도메인 검증 상태: pending(DNS 대기) / verifying(확인 중) / verified(SSL 발급 완료) / error / manual(API 미연동 폴백) */
+  customDomainStatus: varchar('custom_domain_status', { length: 20 }),
+  customDomainVerifiedAt: timestamp('custom_domain_verified_at'),
   templateId: varchar('template_id', { length: 64 }).default('default'),
   status: siteStatusEnum('status').default('draft').notNull(),
   // 사이트 유형 + 어드민 참조 (Laravel DB의 ID만 저장, FK 없음)
