@@ -2,6 +2,7 @@ import { db } from './db';
 import { siteFiles, siteContents, siteConfigs, siteAdmins, sites, webSkinFiles, bannerAreas, bannerItems, boards, boardPosts } from '@/drizzle/schema';
 import { eq, and, asc, desc } from 'drizzle-orm';
 import { getFileContent } from './site';
+import { adminApi } from './admin-api';
 
 interface TemplateContext {
   siteId: string;
@@ -574,9 +575,11 @@ async function processBannerLoops(
 
 /**
  * 게시판 치환코드 처리
- * - <!--@inquiry_form--> : 문의 폼 팝업 위젯 (인라인 HTML+JS)
- * - <!--@qna_loop-->...<!--@end_qna_loop--> : Q&A 반복 출력
- * - <!--@inquiry_list--> : 최근 문의 목록 (제목만)
+ * - <!--@inquiry_form--> : 문의 폼 팝업 위젯 (인라인 HTML+JS). 제출 시 로컬 Postgres +
+ *                          루딤링크(Laravel) 어드민에 미러링.
+ * - <!--@qna_loop-->...<!--@end_qna_loop--> : 로컬 Q&A 반복 출력 (레거시)
+ * - <!--@faq_loop-->...<!--@end_faq_loop--> : 루딤링크 Laravel FAQ 게시판 반복 출력 (신규)
+ * - <!--@inquiry_list--> : 최근 문의 목록 (로컬 DB)
  */
 async function processBoardCodes(siteId: string, slug: string, html: string): Promise<string> {
   // ── inquiry_form 위젯 ──
@@ -680,6 +683,35 @@ async function processBoardCodes(siteId: string, slug: string, html: string): Pr
 <!-- /문의 폼 위젯 -->`;
 
     html = html.replace('<!--@inquiry_form-->', widget);
+  }
+
+  // ── faq_loop (루딤링크 Laravel 어드민 FAQ 게시판에서 로드) ──
+  // @qna_loop 와 별개로 Laravel 어드민의 질문답변(FAQ) 게시판을 표시.
+  // 마커 예: <!--@faq_loop-->...<!--@end_faq_loop-->
+  //   템플릿 변수: {#faq_title} = 질문, {#faq_content} = 답변 HTML, {#faq_num} = 순번
+  const faqLoopRegex = /<!--@faq_loop-->([\s\S]*?)<!--@end_faq_loop-->/g;
+  const faqMatch = faqLoopRegex.exec(html);
+  if (faqMatch) {
+    const [fullMatch, template] = faqMatch;
+    try {
+      const result = await adminApi<{ ok: boolean; posts?: Array<{ id: number; title: string; content: string; author: string | null; created_label: string }> }>(
+        'GET', `/api/sites/${encodeURIComponent(slug)}/boards/faq/posts?limit=50`
+      );
+      const posts = result.ok && result.data?.posts ? result.data.posts : [];
+      if (posts.length > 0) {
+        const rendered = posts.map((post, idx) => template
+          .replace(/\{#faq_title\}/g, escapeHtmlTpl(post.title || ''))
+          .replace(/\{#faq_content\}/g, post.content || '')
+          .replace(/\{#faq_num\}/g, String(idx + 1))
+          .replace(/\{#faq_date\}/g, post.created_label || '')
+        ).join('\n');
+        html = html.replace(fullMatch, rendered);
+      } else {
+        html = html.replace(fullMatch, '<!-- no FAQ data -->');
+      }
+    } catch {
+      html = html.replace(fullMatch, '<!-- FAQ load failed -->');
+    }
   }
 
   // ── qna_loop ──
@@ -834,5 +866,12 @@ export function getAvailableVariables(): { code: string; description: string; ca
     { code: '{#qna_num}', description: 'Q&A 번호 (루프 내)', category: '게시판' },
     { code: '{#qna_author}', description: 'Q&A 작성자 (루프 내)', category: '게시판' },
     { code: '{#qna_date}', description: 'Q&A 작성일 (루프 내)', category: '게시판' },
+    // FAQ 치환코드 (루딤링크 Laravel 어드민 FAQ 게시판 기반)
+    { code: '<!--@faq_loop-->', description: 'FAQ 루프 시작 (루딤링크 FAQ)', category: '게시판' },
+    { code: '<!--@end_faq_loop-->', description: 'FAQ 루프 끝', category: '게시판' },
+    { code: '{#faq_title}', description: 'FAQ 질문 (루프 내)', category: '게시판' },
+    { code: '{#faq_content}', description: 'FAQ 답변 HTML (루프 내)', category: '게시판' },
+    { code: '{#faq_num}', description: 'FAQ 순번 (루프 내)', category: '게시판' },
+    { code: '{#faq_date}', description: 'FAQ 작성일 (루프 내)', category: '게시판' },
   ];
 }

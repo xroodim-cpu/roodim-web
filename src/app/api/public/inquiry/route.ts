@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { sites, boards, boardPosts } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
 import { ensureSystemBoards } from '@/lib/board-utils';
+import { adminApi } from '@/lib/admin-api';
 
 /**
  * POST /api/public/inquiry
@@ -73,6 +74,10 @@ export async function POST(req: NextRequest) {
       authorPhone: authorPhone || null,
       formData: fields,
     }).returning();
+
+    // 루딤링크(Laravel 어드민) 에도 미러링 — 실패해도 사용자 응답에는 영향 없음 (fire-and-forget).
+    adminApi('POST', `/api/sites/${encodeURIComponent(slug)}/boards/inquiry/submit`, { fields })
+      .catch((err) => console.warn('[inquiry mirror → laravel]', err));
 
     return NextResponse.json({
       ok: true,
