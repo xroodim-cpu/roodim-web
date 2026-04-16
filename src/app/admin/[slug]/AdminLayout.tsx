@@ -53,6 +53,11 @@ const TOP_MENUS: TopMenu[] = [
     href: '/services',
   },
   {
+    key: 'boards',
+    label: '게시판',
+    href: '/boards',
+  },
+  {
     key: 'site',
     label: '사이트',
     href: '/site',

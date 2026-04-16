@@ -352,6 +352,47 @@ export const workboardMembers = pgTable('workboard_members', {
   uniqueIndex('workboard_members_wb_site_idx').on(table.workboardId, table.siteId),
 ]);
 
+// ===== board_type enum =====
+export const boardTypeEnum = pgEnum('board_type', ['system', 'custom']);
+
+// ===== boards (게시판) =====
+export const boards = pgTable('boards', {
+  id: serial('id').primaryKey(),
+  siteId: uuid('site_id').notNull().references(() => sites.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  slug: varchar('slug', { length: 100 }).notNull(),
+  boardType: boardTypeEnum('board_type').default('custom').notNull(),
+  systemKey: varchar('system_key', { length: 50 }),  // 'inquiry' | 'qna' | null
+  description: text('description'),
+  sortOrder: integer('sort_order').default(0).notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('boards_site_slug_idx').on(table.siteId, table.slug),
+]);
+
+// ===== board_posts (게시물) =====
+export const boardPosts = pgTable('board_posts', {
+  id: serial('id').primaryKey(),
+  boardId: integer('board_id').notNull().references(() => boards.id, { onDelete: 'cascade' }),
+  siteId: uuid('site_id').notNull().references(() => sites.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 500 }).notNull(),
+  content: text('content'),                              // Rich HTML
+  authorName: varchar('author_name', { length: 100 }),
+  authorEmail: varchar('author_email', { length: 255 }),
+  authorPhone: varchar('author_phone', { length: 50 }),
+  formData: jsonb('form_data'),                          // 문의폼 구조화 데이터
+  isVisible: boolean('is_visible').default(true).notNull(),
+  isPinned: boolean('is_pinned').default(false).notNull(),
+  viewCount: integer('view_count').default(0).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('board_posts_board_idx').on(table.boardId),
+  index('board_posts_site_idx').on(table.siteId),
+]);
+
 // ===== roodim_sync_logs (동기화 로그) =====
 export const roodimSyncLogs = pgTable('roodim_sync_logs', {
   id: serial('id').primaryKey(),
