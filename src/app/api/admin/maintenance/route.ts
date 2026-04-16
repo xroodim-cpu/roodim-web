@@ -1,7 +1,20 @@
 import { db } from '@/lib/db';
-import { sites, maintenanceRequests } from '@/drizzle/schema';
-import { eq, and } from 'drizzle-orm';
+import { maintenanceRequests } from '@/drizzle/schema';
+import { and, eq, desc } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAdminAccess } from '@/lib/admin-session';
+
+const VALID_STATUSES = ['pending', 'reviewing', 'working', 'done', 'cancelled'] as const;
+type ValidStatus = (typeof VALID_STATUSES)[number];
+const VALID_PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
+type ValidPriority = (typeof VALID_PRIORITIES)[number];
+
+function isValidStatus(v: unknown): v is ValidStatus {
+  return typeof v === 'string' && (VALID_STATUSES as readonly string[]).includes(v);
+}
+function isValidPriority(v: unknown): v is ValidPriority {
+  return typeof v === 'string' && (VALID_PRIORITIES as readonly string[]).includes(v);
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,56 +23,43 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status');
 
     if (!slug) {
-      return NextResponse.json(
-        { error: 'slug parameter is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'slug is required' }, { status: 400 });
     }
 
-    // 사이트 조회
-    const site = await db.query.sites.findFirst({
-      where: eq(sites.slug, slug),
-    });
-
-    if (!site) {
-      return NextResponse.json(
-        { error: 'Site not found' },
-        { status: 404 }
-      );
+    const session = await verifyAdminAccess(slug);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 유지보수 요청 조회
-    let whereConditions: any = eq(maintenanceRequests.siteId, site.id);
-
-    if (status && status !== 'all') {
-      whereConditions = and(
-        eq(maintenanceRequests.siteId, site.id),
-        eq(maintenanceRequests.status, status as any)
-      );
+    let whereClause = eq(maintenanceRequests.siteId, session.site_id);
+    if (status && status !== 'all' && isValidStatus(status)) {
+      whereClause = and(
+        eq(maintenanceRequests.siteId, session.site_id),
+        eq(maintenanceRequests.status, status)
+      )!;
     }
 
-    const requests = await db
+    const rows = await db
       .select()
       .from(maintenanceRequests)
-      .where(whereConditions)
-      .orderBy((t) => t.createdAt);
+      .where(whereClause)
+      .orderBy(desc(maintenanceRequests.createdAt));
 
     return NextResponse.json({
-      requests,
-      total: requests.length,
+      ok: true,
+      requests: rows,
+      total: rows.length,
     });
   } catch (error) {
     console.error('[GET /api/admin/maintenance]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { slug, title, description, category, priority } = await req.json();
+    const body = await req.json();
+    const { slug, title, description, category, priority } = body;
 
     if (!slug || !title) {
       return NextResponse.json(
@@ -68,41 +68,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 사이트 조회
-    const site = await db.query.sites.findFirst({
-      where: eq(sites.slug, slug),
-    });
-
-    if (!site) {
-      return NextResponse.json(
-        { error: 'Site not found' },
-        { status: 404 }
-      );
+    const session = await verifyAdminAccess(slug);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 유지보수 요청 생성
-    const result = await db
+    const priorityValue = isValidPriority(priority) ? priority : 'normal';
+
+    const [row] = await db
       .insert(maintenanceRequests)
       .values({
-        siteId: site.id,
-        title,
-        description: description || '',
-        category: category || 'other',
-        priority: priority || 'normal',
+        siteId: session.site_id,
+        title: String(title).trim(),
+        description: typeof description === 'string' ? description : '',
+        category: typeof category === 'string' ? category : 'other',
+        priority: priorityValue,
         status: 'pending',
-        requestedBy: {},
+        requestedBy: { name: session.name, auth_type: session.auth_type },
         attachments: [],
       })
       .returning();
 
-    return NextResponse.json({
-      request: result[0],
-    });
+    return NextResponse.json({ ok: true, request: row });
   } catch (error) {
     console.error('[POST /api/admin/maintenance]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

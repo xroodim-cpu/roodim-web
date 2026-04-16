@@ -52,6 +52,8 @@ export default function WorkPage({
   const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   // URL 쿼리스트링 기반 필터 (사이드바 서브메뉴와 동기화)
   const statusFilter = searchParams.get('status') || 'all';
@@ -62,33 +64,59 @@ export default function WorkPage({
     });
   }, [params]);
 
+  const fetchRequests = async (siteSlug: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const url = `/api/admin/maintenance?slug=${siteSlug}`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        setRequests(data.requests || []);
+      } else {
+        setError(`작업 목록을 불러올 수 없습니다 (${response.status})`);
+        setRequests([]);
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Failed to fetch requests:', errorMsg);
+      setError(`작업 목록 로딩 실패: ${errorMsg}`);
+      setRequests([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const triggerSync = async (siteSlug: string) => {
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const res = await fetch(`/api/admin/maintenance/sync?slug=${siteSlug}`, {
+        method: 'POST',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) {
+        setSyncError(
+          data.message || data.error || `동기화 실패 (${res.status})`
+        );
+      }
+      return data;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Failed to sync:', errorMsg);
+      setSyncError(`동기화 실패: ${errorMsg}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   useEffect(() => {
     if (!slug) return;
 
-    async function fetchRequests() {
-      setLoading(true);
-      setError(null);
-      try {
-        const url = `/api/admin/maintenance?slug=${slug}`;
-        const response = await fetch(url);
-        if (response.ok) {
-          const data = await response.json();
-          setRequests(data.requests || []);
-        } else {
-          setError(`작업 목록을 불러올 수 없습니다 (${response.status})`);
-          setRequests([]);
-        }
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-        console.error('Failed to fetch requests:', errorMsg);
-        setError(`작업 목록 로딩 실패: ${errorMsg}`);
-        setRequests([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchRequests();
+    // 백그라운드에서 루딤링크 → 루딤웹 pull (실패 무시)
+    triggerSync(slug).finally(() => {
+      if (slug) fetchRequests(slug);
+    });
   }, [slug]);
 
   const filteredRequests = requests.filter(
@@ -106,16 +134,46 @@ export default function WorkPage({
 
   return (
     <div>
-      <div style={{ marginBottom: 20 }}>
-        <h1 className="c-page-title">작업</h1>
-        <p className="c-page-subtitle">
-          유지보수 요청과 채팅을 관리하세요.
-        </p>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 20,
+          gap: 16,
+        }}
+      >
+        <div>
+          <h1 className="c-page-title">작업</h1>
+          <p className="c-page-subtitle">
+            유지보수 요청과 채팅을 관리하세요.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={async () => {
+            if (!slug) return;
+            await triggerSync(slug);
+            await fetchRequests(slug);
+          }}
+          disabled={syncing}
+        >
+          {syncing ? '동기화 중...' : '↻ 동기화'}
+        </button>
       </div>
 
       {error && (
         <div className="c-alert c-alert-error" style={{ marginBottom: 16 }}>
           {error}
+        </div>
+      )}
+      {syncError && (
+        <div
+          className="c-alert c-alert-warning"
+          style={{ marginBottom: 16, fontSize: 'var(--fs-sm)' }}
+        >
+          {syncError}
         </div>
       )}
 

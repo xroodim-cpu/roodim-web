@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 
 interface Message {
@@ -27,6 +27,7 @@ const STATUS_LABEL: Record<string, string> = {
   reviewing: '검토',
   working: '진행',
   done: '완료',
+  cancelled: '취소',
 };
 
 const STATUS_BADGE: Record<string, string> = {
@@ -34,6 +35,7 @@ const STATUS_BADGE: Record<string, string> = {
   reviewing: 'c-badge-purple',
   working: 'c-badge-info',
   done: 'c-badge-success',
+  cancelled: 'c-badge-gray',
 };
 
 const PRIORITY_LABEL: Record<string, string> = {
@@ -50,6 +52,16 @@ const PRIORITY_BADGE: Record<string, string> = {
   urgent: 'c-badge-error',
 };
 
+const STATUS_FLOW: Array<{ key: string; label: string }> = [
+  { key: 'pending', label: '대기' },
+  { key: 'reviewing', label: '검토' },
+  { key: 'working', label: '진행' },
+  { key: 'done', label: '완료' },
+];
+
+// 폴링 주기 (ms). 2초 = 거의 실시간
+const POLL_INTERVAL_MS = 2000;
+
 export default function WorkDetailPage({
   params,
 }: {
@@ -63,6 +75,12 @@ export default function WorkDetailPage({
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [isLive, setIsLive] = useState(false);
+
+  // 폴링 커서 — 마지막으로 받은 메시지 시간 (ISO)
+  const lastMessageTsRef = useRef<string | null>(null);
+  const messageEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     params.then(({ slug: paramSlug, id: paramId }) => {
@@ -71,8 +89,11 @@ export default function WorkDetailPage({
     });
   }, [params]);
 
+  // 초기 로딩
   useEffect(() => {
     if (!slug || !workId) return;
+
+    let cancelled = false;
 
     async function fetchRequest() {
       setLoading(true);
@@ -81,23 +102,131 @@ export default function WorkDetailPage({
         const response = await fetch(
           `/api/admin/maintenance/${workId}?slug=${slug}`
         );
-        if (response.ok) {
-          const data = await response.json();
-          setRequest(data.request);
+        if (!response.ok) {
+          if (!cancelled) {
+            setError(`작업을 불러올 수 없습니다 (${response.status})`);
+          }
+          return;
+        }
+        const data = await response.json();
+        if (cancelled) return;
+
+        setRequest(data.request);
+        // 마지막 메시지 타임스탬프 저장
+        const msgs = data.request?.messages || [];
+        if (msgs.length > 0) {
+          lastMessageTsRef.current = msgs[msgs.length - 1].createdAt;
         } else {
-          setError(`작업을 불러올 수 없습니다 (${response.status})`);
+          // 메시지가 없으면 요청 생성 시점 기준으로 폴링 시작
+          lastMessageTsRef.current = data.request?.createdAt || null;
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Unknown error';
         console.error('Failed to fetch request:', errorMsg);
-        setError(`작업 로딩 실패: ${errorMsg}`);
+        if (!cancelled) {
+          setError(`작업 로딩 실패: ${errorMsg}`);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
     fetchRequest();
+
+    return () => {
+      cancelled = true;
+    };
   }, [slug, workId]);
+
+  // 새 메시지 증분 폴링
+  const pollMessages = useCallback(async () => {
+    if (!slug || !workId) return;
+    const since = lastMessageTsRef.current;
+    const url = new URL(
+      `/api/admin/maintenance/${workId}/messages`,
+      window.location.origin
+    );
+    url.searchParams.set('slug', slug);
+    if (since) url.searchParams.set('since', since);
+
+    try {
+      const res = await fetch(url.toString());
+      if (!res.ok) {
+        setIsLive(false);
+        return;
+      }
+      const data = await res.json();
+      setIsLive(true);
+      const newMsgs: Message[] = data.messages || [];
+      if (newMsgs.length === 0) return;
+
+      // 중복 제거 후 병합
+      setRequest((prev) => {
+        if (!prev) return prev;
+        const existingIds = new Set((prev.messages || []).map((m) => m.id));
+        const uniqueNew = newMsgs.filter((m) => !existingIds.has(m.id));
+        if (uniqueNew.length === 0) return prev;
+        lastMessageTsRef.current = uniqueNew[uniqueNew.length - 1].createdAt;
+        return {
+          ...prev,
+          messages: [...(prev.messages || []), ...uniqueNew],
+        };
+      });
+    } catch (err) {
+      console.error('[poll] failed', err);
+      setIsLive(false);
+    }
+  }, [slug, workId]);
+
+  // 폴링 인터벌 + visibility 기반 pause
+  useEffect(() => {
+    if (!slug || !workId || loading || !request) return;
+
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const start = () => {
+      if (timer !== null) return;
+      timer = setInterval(() => {
+        pollMessages();
+      }, POLL_INTERVAL_MS);
+    };
+
+    const stop = () => {
+      if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        // 포커스 복귀 시 즉시 1회 + 폴링 재개
+        pollMessages();
+        start();
+      } else {
+        stop();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    if (document.visibilityState === 'visible') {
+      start();
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      stop();
+    };
+  }, [slug, workId, loading, request, pollMessages]);
+
+  // 새 메시지 추가 시 스크롤 맨 아래로
+  useEffect(() => {
+    if (messageEndRef.current) {
+      messageEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  }, [request?.messages?.length]);
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !slug || !workId) return;
@@ -119,12 +248,17 @@ export default function WorkDetailPage({
 
       if (response.ok) {
         const data = await response.json();
-        if (request) {
-          setRequest({
-            ...request,
-            messages: [...(request.messages || []), data.message],
-          });
-        }
+        const msg: Message = data.message;
+        setRequest((prev) => {
+          if (!prev) return prev;
+          const existingIds = new Set((prev.messages || []).map((m) => m.id));
+          if (existingIds.has(msg.id)) return prev;
+          lastMessageTsRef.current = msg.createdAt;
+          return {
+            ...prev,
+            messages: [...(prev.messages || []), msg],
+          };
+        });
         setNewMessage('');
       } else {
         setMessageError(`메시지 전송 실패 (${response.status})`);
@@ -135,6 +269,40 @@ export default function WorkDetailPage({
       setMessageError(`전송 실패: ${errorMsg}`);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleStatusChange = async (nextStatus: string) => {
+    if (!slug || !workId || !request || statusBusy) return;
+    if (request.status === nextStatus) return;
+    setStatusBusy(true);
+    try {
+      const response = await fetch(`/api/admin/maintenance/${workId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, status: nextStatus }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setRequest((prev) =>
+          prev ? { ...prev, status: data.request.status } : prev
+        );
+      } else {
+        setMessageError(`상태 변경 실패 (${response.status})`);
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Failed to update status:', errorMsg);
+      setMessageError(`상태 변경 실패: ${errorMsg}`);
+    } finally {
+      setStatusBusy(false);
     }
   };
 
@@ -250,6 +418,43 @@ export default function WorkDetailPage({
             </div>
           </div>
         </div>
+
+        {/* 상태 변경 버튼 */}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 8,
+            marginTop: 16,
+            paddingTop: 16,
+            borderTop: '1px solid var(--border-light)',
+            alignItems: 'center',
+          }}
+        >
+          <span
+            style={{
+              fontSize: 'var(--fs-sm)',
+              color: 'var(--text-secondary)',
+              fontWeight: 'var(--fw-semi)',
+              marginRight: 4,
+            }}
+          >
+            상태 변경:
+          </span>
+          {STATUS_FLOW.map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              className={`btn btn-sm ${
+                request.status === s.key ? 'btn-primary' : 'btn-secondary'
+              }`}
+              onClick={() => handleStatusChange(s.key)}
+              disabled={statusBusy || request.status === s.key}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* 채팅 */}
@@ -263,7 +468,19 @@ export default function WorkDetailPage({
         <div className="card-header">
           <div>
             <div className="card-title">대화</div>
-            <div className="card-subtitle">고객과 메시지를 주고받으세요.</div>
+            <div className="card-subtitle">
+              고객과 메시지를 주고받으세요.
+              <span
+                style={{
+                  marginLeft: 8,
+                  fontSize: 'var(--fs-xs)',
+                  color: isLive ? 'var(--success)' : 'var(--text-tertiary)',
+                  fontWeight: 'var(--fw-semi)',
+                }}
+              >
+                {isLive ? '● 실시간' : '○ 연결 중'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -339,6 +556,7 @@ export default function WorkDetailPage({
               );
             })
           )}
+          <div ref={messageEndRef} />
         </div>
 
         <div
@@ -359,7 +577,8 @@ export default function WorkDetailPage({
             className="form-textarea"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="메시지를 입력하세요..."
+            onKeyDown={handleKeyDown}
+            placeholder="메시지를 입력하세요... (Enter 전송, Shift+Enter 줄바꿈)"
             rows={3}
             style={{ marginBottom: 12 }}
           />
