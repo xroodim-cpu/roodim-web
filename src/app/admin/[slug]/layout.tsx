@@ -21,7 +21,7 @@ export default async function RootLayout({ children, params }: AdminLayoutProps)
   // 어드민 접근 권한 검증
   const adminInfo = await verifyAdminAccess(slug);
   if (!adminInfo) {
-    redirect(`/admin/login?next=/admin/${slug}`);
+    redirect(`/admin/login/${slug}`);
   }
 
   // 사이트 정보 조회
@@ -30,7 +30,7 @@ export default async function RootLayout({ children, params }: AdminLayoutProps)
   });
 
   if (!site) {
-    redirect('/admin/login');
+    redirect(`/admin/login/${slug}`);
   }
 
   // 워크보드 존재 여부 확인 (나중에 구현)
