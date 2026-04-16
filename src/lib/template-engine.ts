@@ -754,6 +754,78 @@ async function processBoardCodes(siteId: string, slug: string, html: string): Pr
     }
   }
 
+  // ── #faq.fl 자동 연동 ──
+  // 루딤링크(Laravel) FAQ 게시판이 있고, 스킨 HTML 에 <ul id="faq" class="fl">
+  // (또는 ol / class 에 fl 포함) 이 있으면 해당 요소의 <li> 하위를 FAQ 데이터로 치환.
+  //
+  // 작동 방식:
+  //   1) <ul id="faq" class="... fl ...">...</ul> 매칭 (ol 도 지원, id/class 순서 무관)
+  //   2) 안쪽 첫 <li>...</li> 를 템플릿으로 사용
+  //   3) 템플릿 내에 {#faq_title} / {#faq_content} / {#faq_num} / {#faq_date} 플레이스홀더가
+  //      있으면 해당 값으로 치환. 플레이스홀더가 전혀 없으면 안전한 기본 구조로 교체.
+  //   4) <!--@faq_loop--> 마커가 이미 페이지에 있으면 해당 블록의 처리를 우선하고,
+  //      #faq.fl 자동 주입은 중복 방지를 위해 건너뜀.
+  //
+  // 목적: 사용자가 기존 스킨 HTML 의 <ul id="faq" class="fl"> 에 하드코딩한 예시 FAQ 를
+  //       매번 수정하지 않아도, 루딤링크의 FAQ 게시판 데이터가 자동 반영되게 함.
+  if (!html.includes('<!--@faq_loop-->')) {
+    const faqListRegex = /<(ul|ol)\b([^>]*)>([\s\S]*?)<\/\1>/gi;
+    const matches: Array<{ full: string; tag: string; attrs: string; inner: string }> = [];
+    let m: RegExpExecArray | null;
+    while ((m = faqListRegex.exec(html)) !== null) {
+      const [full, tag, attrs, inner] = m;
+      // id="faq" AND class 에 "fl" 이 하나의 단어로 포함
+      const hasFaqId = /\bid\s*=\s*["']faq["']/i.test(attrs);
+      const hasFlClass = /\bclass\s*=\s*["'][^"']*\bfl\b[^"']*["']/i.test(attrs);
+      if (hasFaqId && hasFlClass) {
+        matches.push({ full, tag, attrs, inner });
+      }
+    }
+
+    if (matches.length > 0) {
+      // Laravel 어드민 FAQ 조회 (fail-open — 실패 시 원본 유지)
+      let posts: Array<{ id: number; title: string; content: string; author: string | null; created_label: string }> = [];
+      try {
+        const result = await adminApi<{ ok: boolean; posts?: typeof posts }>(
+          'GET',
+          `/api/sites/${encodeURIComponent(slug)}/bulletins/faq/posts?limit=50`
+        );
+        if (result.ok && result.data?.posts) {
+          posts = result.data.posts;
+        }
+      } catch {
+        // 네트워크/HMAC 오류 시 원본 그대로 (디자인 깨짐 방지)
+      }
+
+      if (posts.length > 0) {
+        for (const match of matches) {
+          // 첫 <li>...</li> 를 템플릿으로
+          const liMatch = /<li\b[^>]*>[\s\S]*?<\/li>/i.exec(match.inner);
+          const templateLi = liMatch
+            ? liMatch[0]
+            : '<li><strong>{#faq_title}</strong><div>{#faq_content}</div></li>';
+
+          const hasPlaceholder = /\{#faq_(title|content|num|date)\}/.test(templateLi);
+
+          const renderedItems = posts.map((post, idx) => {
+            if (hasPlaceholder) {
+              return templateLi
+                .replace(/\{#faq_title\}/g, escapeHtmlTpl(post.title || ''))
+                .replace(/\{#faq_content\}/g, post.content || '')
+                .replace(/\{#faq_num\}/g, String(idx + 1))
+                .replace(/\{#faq_date\}/g, post.created_label || '');
+            }
+            // 플레이스홀더 없으면 최소 안전 구조로 치환 (원 <li> 디자인 유지 위해 최소 HTML)
+            return `<li><strong>${escapeHtmlTpl(post.title || '')}</strong><div>${post.content || ''}</div></li>`;
+          }).join('\n');
+
+          const replacement = `<${match.tag}${match.attrs}>\n${renderedItems}\n</${match.tag}>`;
+          html = html.replace(match.full, replacement);
+        }
+      }
+    }
+  }
+
   // ── inquiry_list ──
   if (html.includes('<!--@inquiry_list-->')) {
     const [inquiryBoard] = await db.select()
