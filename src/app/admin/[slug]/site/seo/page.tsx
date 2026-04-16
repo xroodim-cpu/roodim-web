@@ -11,6 +11,7 @@ interface SeoData {
   og_image: string;
   favicon_url: string;
   sns_share_image: string;
+  robots: string;
 }
 
 const EMPTY_SEO: SeoData = {
@@ -22,7 +23,32 @@ const EMPTY_SEO: SeoData = {
   og_image: '',
   favicon_url: '',
   sns_share_image: '',
+  robots: 'index, follow',
 };
+
+/** 검색 로봇 프리셋 — 가장 자주 쓰는 4가지 */
+const ROBOTS_PRESETS: { value: string; label: string; hint: string }[] = [
+  {
+    value: 'index, follow',
+    label: '검색 허용 (index, follow) — 기본값',
+    hint: '검색엔진이 페이지를 수집하고 링크도 따라가도록 허용합니다.',
+  },
+  {
+    value: 'noindex, follow',
+    label: '수집 차단 (noindex, follow)',
+    hint: '검색 결과에는 나오지 않지만 링크는 따라갑니다. 작업 중인 페이지용.',
+  },
+  {
+    value: 'index, nofollow',
+    label: '링크 차단 (index, nofollow)',
+    hint: '페이지는 수집되지만 링크는 따라가지 않습니다.',
+  },
+  {
+    value: 'noindex, nofollow',
+    label: '완전 차단 (noindex, nofollow)',
+    hint: '검색엔진 전체 차단. 내부 테스트 사이트용.',
+  },
+];
 
 export default function SeoPage({
   params,
@@ -62,6 +88,7 @@ export default function SeoPage({
           og_image: saved.og_image || '',
           favicon_url: saved.favicon_url || '',
           sns_share_image: saved.sns_share_image || '',
+          robots: saved.robots || 'index, follow',
         });
       } else {
         setError(`SEO 설정 로딩 실패 (${response.status})`);
@@ -206,6 +233,84 @@ export default function SeoPage({
                 setSeo({ ...seo, meta_keywords: e.target.value })
               }
               placeholder="키워드1, 키워드2, 키워드3 (쉼표로 구분)"
+            />
+          </div>
+        </div>
+
+        {/* 검색 로봇 (robots) */}
+        <div
+          className="card"
+          style={{ border: '1px solid var(--border)', padding: 24 }}
+        >
+          <h2
+            style={{
+              fontSize: 'var(--fs-lg)',
+              fontWeight: 'var(--fw-bold)',
+              color: 'var(--text-primary)',
+              margin: '0 0 16px',
+            }}
+          >
+            검색 로봇 (robots)
+          </h2>
+          <p
+            style={{
+              fontSize: 'var(--fs-xs)',
+              color: 'var(--text-tertiary)',
+              marginBottom: 20,
+            }}
+          >
+            치환코드: {'{{ROBOTS}}'} — 스킨 head의 {'<meta name="robots">'} 에
+            주입됩니다.
+          </p>
+
+          <div className="form-group">
+            <label htmlFor="robots-preset" className="form-label">
+              프리셋 선택
+            </label>
+            <select
+              id="robots-preset"
+              className="form-input"
+              value={
+                ROBOTS_PRESETS.find((p) => p.value === seo.robots)?.value ||
+                'custom'
+              }
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val !== 'custom') {
+                  setSeo({ ...seo, robots: val });
+                }
+              }}
+            >
+              {ROBOTS_PRESETS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+              <option value="custom">직접 입력</option>
+            </select>
+            <p
+              style={{
+                fontSize: 'var(--fs-xs)',
+                color: 'var(--text-tertiary)',
+                marginTop: 6,
+              }}
+            >
+              {ROBOTS_PRESETS.find((p) => p.value === seo.robots)?.hint ||
+                '직접 입력한 값이 그대로 meta robots에 적용됩니다.'}
+            </p>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="robots-value" className="form-label">
+              최종 적용 값
+            </label>
+            <input
+              id="robots-value"
+              type="text"
+              className="form-input"
+              value={seo.robots}
+              onChange={(e) => setSeo({ ...seo, robots: e.target.value })}
+              placeholder="예: index, follow"
             />
           </div>
         </div>

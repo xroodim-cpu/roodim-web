@@ -324,6 +324,8 @@ async function applyVariables(ctx: TemplateContext, html: string): Promise<strin
     'OG_IMAGE': resolveAssetUrl(seo.og_image || ''),
     'FAVICON_URL': resolveAssetUrl(seo.favicon_url || ''),
     'SNS_SHARE_IMAGE': resolveAssetUrl(seo.sns_share_image || seo.og_image || ''),
+    // 검색 로봇 — 기본 index,follow. 검색엔진 차단 시 noindex,nofollow 등
+    'ROBOTS': seo.robots || 'index, follow',
   };
 
   let result = html;
@@ -800,6 +802,7 @@ export function getAvailableVariables(): { code: string; description: string; ca
     { code: '{{OG_IMAGE}}', description: 'OG 이미지 URL (SNS 공유 이미지)', category: 'SEO' },
     { code: '{{FAVICON_URL}}', description: '파비콘 이미지 URL', category: 'SEO' },
     { code: '{{SNS_SHARE_IMAGE}}', description: 'SNS 공유 이미지 URL', category: 'SEO' },
+    { code: '{{ROBOTS}}', description: '검색 로봇 지시자 (index,follow / noindex,nofollow 등)', category: 'SEO' },
     // 레이아웃 (헤더/푸터)
     { code: '<!--@header-->', description: '스킨의 header.html 내용 삽입 (없으면 미노출)', category: '레이아웃' },
     { code: '<!--@footer-->', description: '스킨의 footer.html 내용 삽입 (없으면 미노출)', category: '레이아웃' },
