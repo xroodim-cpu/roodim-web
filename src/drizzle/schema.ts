@@ -262,6 +262,8 @@ export const bannerAreas = pgTable('banner_areas', {
 ]);
 
 // ===== banner_items (개별 배너) =====
+// 주의: images/videos/texts/links 는 루딤링크(Laravel)가 관리하는 JSON 컬럼이다.
+//       roodim-web 은 read-only 로만 사용 — 마이그레이션/push 로 컬럼을 건드리면 안 됨.
 export const bannerItems = pgTable('banner_items', {
   id: serial('id').primaryKey(),
   areaId: integer('area_id').notNull().references(() => bannerAreas.id, { onDelete: 'cascade' }),
@@ -278,6 +280,14 @@ export const bannerItems = pgTable('banner_items', {
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  // ── 루딤링크 측 다중 자산 JSON (읽기 전용)
+  images: jsonb('images').$type<string[]>(),
+  videos: jsonb('videos').$type<string[]>(),
+  texts: jsonb('texts').$type<string[]>(),
+  links: jsonb('links').$type<Array<{ url: string; target: string }>>(),
+  displayMethod: varchar('display_method', { length: 50 }),
+  aspectRatio: varchar('aspect_ratio', { length: 20 }),
+  autoplay: boolean('autoplay'),
 });
 
 // ===== site_files (회원 임대 홈페이지 파일 저장 - 카페24 방식) =====

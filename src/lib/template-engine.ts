@@ -367,7 +367,7 @@ async function processBannerAreas(siteId: string, html: string): Promise<string>
       .limit(1);
 
     // area row 가 없으면 items 도 자동으로 빈 배열
-    const items = area[0]
+    const rawItems = area[0]
       ? await db.select()
           .from(bannerItems)
           .where(and(
@@ -376,6 +376,57 @@ async function processBannerAreas(siteId: string, html: string): Promise<string>
           ))
           .orderBy(asc(bannerItems.sortOrder), asc(bannerItems.num))
       : [];
+
+    // ── 다중 자산 JSON(images/videos/texts/links) 를 단일 필드로 전개(expand)
+    //
+    // 배경:
+    //  - 루딤링크(Laravel) 어드민은 한 배너 슬롯(`banner_items` row)에 여러 이미지/영상/
+    //    텍스트/링크를 JSON 배열로 저장한다. 예) area 3(블로그)의 num=1 row 하나에
+    //    이미지 19장이 들어있음.
+    //  - 기존 렌더러는 `img_url`/`video_url` 등 단일 컬럼만 봐서, 업로드된 이미지가
+    //    모두 무시되고 `.roo-empty` 로 대체됐음.
+    //
+    // 전개 규칙:
+    //  1) `images` 배열 길이 ≥ 2 : 배열 길이만큼 "가상 item" 으로 복제해 각 이미지를
+    //     별개 배너로 렌더링. banner_loop 이 N 번 반복된다. texts/links 가 짧으면
+    //     [0] 을 재사용.
+    //  2) 배열이 비어있거나 1개 : 기존 단일 컬럼 + 배열[0] fallback. item 하나로 유지.
+    //  3) 번호 기반 치환(`{#img_1}` 등) 은 `num` 속성으로 매칭되므로, 복제된 가상
+    //     item 은 `num` 을 그대로 유지해 첫 번째만 매칭되게 둔다. (블로그처럼 루프
+    //     기반 영역에서는 num 중복이 무관하다.)
+    type RawItem = typeof rawItems[number];
+    type RenderItem = RawItem; // 필드는 동일, 값이 채워져 있다는 보장만 다름.
+
+    const expand = (item: RawItem): RenderItem[] => {
+      const images = (item.images || []) as string[];
+      const videos = (item.videos || []) as string[];
+      const texts = (item.texts || []) as string[];
+      const links = (item.links || []) as Array<{ url?: string; target?: string }>;
+
+      // 여러 이미지를 가진 단일 row → 이미지 수만큼 전개
+      if (images.length >= 2) {
+        return images.map((img, i) => ({
+          ...item,
+          imgUrl: img,
+          videoUrl: item.videoUrl || videos[i] || videos[0] || null,
+          textContent: item.textContent || texts[i] || texts[0] || null,
+          linkUrl: item.linkUrl || links[i]?.url || links[0]?.url || null,
+          linkTarget: item.linkTarget || links[i]?.target || links[0]?.target || '_self',
+        }));
+      }
+
+      // 단일 이미지/영상 → 배열[0] fallback 만 적용
+      return [{
+        ...item,
+        imgUrl: item.imgUrl || images[0] || null,
+        videoUrl: item.videoUrl || videos[0] || null,
+        textContent: item.textContent || texts[0] || null,
+        linkUrl: item.linkUrl || links[0]?.url || null,
+        linkTarget: item.linkTarget || links[0]?.target || '_self',
+      }];
+    };
+
+    const items: RenderItem[] = rawItems.flatMap(expand);
 
     // 영역 메타 + 번호 기반 + 루프 — 모두 이 area 의 scope 안에서만 치환
     // 주의: HTML 주석(`<!-- area_id="gallery" -->`) 안에 area_id 가 언급돼 있어도
