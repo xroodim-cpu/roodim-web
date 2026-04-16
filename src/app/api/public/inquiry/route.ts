@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     }).returning();
 
     // 루딤링크(Laravel 어드민) 에도 미러링 — 실패해도 사용자 응답에는 영향 없음 (fire-and-forget).
-    adminApi('POST', `/api/sites/${encodeURIComponent(slug)}/boards/inquiry/submit`, { fields })
+    adminApi('POST', `/api/sites/${encodeURIComponent(slug)}/bulletins/inquiry/submit`, { fields })
       .catch((err) => console.warn('[inquiry mirror → laravel]', err));
 
     return NextResponse.json({

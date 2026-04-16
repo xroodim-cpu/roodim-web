@@ -695,7 +695,7 @@ async function processBoardCodes(siteId: string, slug: string, html: string): Pr
     const [fullMatch, template] = faqMatch;
     try {
       const result = await adminApi<{ ok: boolean; posts?: Array<{ id: number; title: string; content: string; author: string | null; created_label: string }> }>(
-        'GET', `/api/sites/${encodeURIComponent(slug)}/boards/faq/posts?limit=50`
+        'GET', `/api/sites/${encodeURIComponent(slug)}/bulletins/faq/posts?limit=50`
       );
       const posts = result.ok && result.data?.posts ? result.data.posts : [];
       if (posts.length > 0) {
