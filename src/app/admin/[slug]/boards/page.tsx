@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import dynamic from 'next/dynamic';
 
 const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), { ssr: false });
@@ -233,6 +233,7 @@ export default function BoardsPage({
   const activeBoard = boards.find((b) => b.id === activeBoardId);
   const isInquiry = activeBoard?.systemKey === 'inquiry';
   const totalPages = Math.ceil(totalPosts / 20);
+  const pinnedCount = posts.filter((p) => p.isPinned).length;
 
   if (!slug || loading) {
     return (
@@ -245,82 +246,36 @@ export default function BoardsPage({
 
   return (
     <>
-      <div style={{ marginBottom: 20 }}>
-        <h1 className="c-page-title">게시판</h1>
-        <p className="c-page-subtitle">
-          게시판과 게시물을 관리합니다. 시스템 게시판(문의, Q&A)은 자동으로
-          생성되며 삭제할 수 없습니다.
-        </p>
-      </div>
-
-      {error && (
-        <div className="c-alert c-alert-error" style={{ marginBottom: 16 }}>
-          {error}
-        </div>
-      )}
-
-      <div className="wb-wrap" style={{ minHeight: 480 }}>
+      <div className="bd-page-wrap">
         {/* 사이드바 — 게시판 목록 */}
-        <aside className={`wb-side${sideOpen ? ' open' : ''}`}>
-          <div
-            style={{
-              fontSize: 'var(--fs-xs)',
-              fontWeight: 'var(--fw-bold)',
-              color: 'var(--text-tertiary)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              padding: '0 12px 12px',
-              borderBottom: '1px solid var(--border)',
-              marginBottom: 12,
-            }}
-          >
-            게시판
-          </div>
+        <aside className={`bd-side wb-side${sideOpen ? ' open' : ''}`}>
+          <div className="bd-side-heading">게시판</div>
 
           <div className="pd-side-group">
             {boards.map((b) => (
-              <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div key={b.id} className="bd-side-row">
                 <button
                   type="button"
-                  className={`pd-side-group-label${activeBoardId === b.id ? ' active' : ''}`}
+                  className={`pd-side-group-label bd-side-btn${activeBoardId === b.id ? ' active' : ''}`}
                   onClick={() => {
                     setActiveBoardId(b.id);
                     setFilter('all');
                     setSideOpen(false);
                   }}
-                  style={{
-                    flex: 1,
-                    textAlign: 'left',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    font: 'inherit',
-                    padding: '8px 12px',
-                  }}
                 >
-                  {b.boardType === 'system' && (
-                    <span style={{ marginRight: 4, fontSize: 'var(--fs-xs)' }}>📌</span>
-                  )}
-                  {b.name}
-                  <span
-                    style={{
-                      marginLeft: 6,
-                      fontSize: 'var(--fs-xs)',
-                      color: 'var(--text-tertiary)',
-                    }}
-                  >
-                    {b.postCount}
-                  </span>
+                  {b.boardType === 'system' && <span className="bd-side-pin">📌</span>}
+                  <span className="bd-side-name">{b.name}</span>
+                  <span className="pd-side-group-count">{b.postCount}</span>
                 </button>
                 {b.boardType === 'custom' && (
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm"
+                    className="bd-side-delete"
                     onClick={() => handleDeleteBoard(b.id)}
-                    style={{ padding: '2px 6px', fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}
-                    title="삭제"
+                    title="게시판 삭제"
+                    aria-label="게시판 삭제"
                   >
-                    ✕
+                    ×
                   </button>
                 )}
               </div>
@@ -328,18 +283,22 @@ export default function BoardsPage({
           </div>
 
           {/* 게시판 추가 */}
-          <div style={{ padding: '16px 12px 0', borderTop: '1px solid var(--border)', marginTop: 12 }}>
+          <div className="bd-side-add">
             {showAddBoard ? (
-              <form onSubmit={handleAddBoard} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <form onSubmit={handleAddBoard} className="bd-side-add-form">
                 <input
                   className="form-input"
                   placeholder="게시판 이름"
                   value={newBoardName}
                   onChange={(e) => {
                     setNewBoardName(e.target.value);
-                    setNewBoardSlug(e.target.value.toLowerCase().replace(/[^a-z0-9가-힣]/g, '-').replace(/-+/g, '-'));
+                    setNewBoardSlug(
+                      e.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9가-힣]/g, '-')
+                        .replace(/-+/g, '-')
+                    );
                   }}
-                  style={{ fontSize: 'var(--fs-xs)' }}
                   autoFocus
                 />
                 <input
@@ -347,10 +306,9 @@ export default function BoardsPage({
                   placeholder="슬러그 (영문)"
                   value={newBoardSlug}
                   onChange={(e) => setNewBoardSlug(e.target.value)}
-                  style={{ fontSize: 'var(--fs-xs)' }}
                 />
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button type="submit" className="btn btn-primary btn-sm" style={{ flex: 1 }}>
+                <div className="bd-side-add-actions">
+                  <button type="submit" className="btn btn-primary btn-sm">
                     추가
                   </button>
                   <button
@@ -365,9 +323,8 @@ export default function BoardsPage({
             ) : (
               <button
                 type="button"
-                className="btn btn-secondary btn-sm"
+                className="btn btn-secondary btn-sm bd-side-add-btn"
                 onClick={() => setShowAddBoard(true)}
-                style={{ width: '100%' }}
               >
                 + 게시판 추가
               </button>
@@ -376,180 +333,152 @@ export default function BoardsPage({
         </aside>
 
         {/* 메인 — 게시물 목록 */}
-        <main className="wb-main" style={{ paddingTop: 0 }}>
+        <main className="bd-main">
+          {/* 페이지 헤더 */}
+          <div className="bd-page-header">
+            <div className="bd-page-header-left">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm bd-side-toggle"
+                onClick={() => setSideOpen((v) => !v)}
+                aria-label="게시판 목록 열기"
+              >
+                ☰
+              </button>
+              <div>
+                <h1 className="c-page-title">
+                  {activeBoard ? activeBoard.name : '게시판'}
+                </h1>
+                <p className="c-page-subtitle">
+                  {activeBoard?.description ||
+                    '게시판과 게시물을 관리합니다. 시스템 게시판(문의·Q&A)은 자동 생성됩니다.'}
+                </p>
+              </div>
+            </div>
+            {activeBoard && (
+              <button type="button" className="btn btn-primary btn-sm" onClick={openNewPost}>
+                글쓰기
+              </button>
+            )}
+          </div>
+
+          {error && (
+            <div className="c-alert c-alert-error" style={{ marginBottom: 16 }}>
+              {error}
+            </div>
+          )}
+
           {activeBoard && (
             <>
-              {/* 상단 바 */}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '16px 0',
-                  borderBottom: '1px solid var(--border)',
-                  marginBottom: 16,
-                  flexWrap: 'wrap',
-                  gap: 8,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  {/* 모바일 사이드바 토글 */}
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm topnav-side-toggle"
-                    onClick={() => setSideOpen((v) => !v)}
-                    style={{ display: 'none' }}
-                  >
-                    ☰
-                  </button>
-                  <h2
-                    style={{
-                      fontSize: 'var(--fs-lg)',
-                      fontWeight: 'var(--fw-bold)',
-                      margin: 0,
-                    }}
-                  >
-                    {activeBoard.name}
-                  </h2>
-                  {activeBoard.description && (
-                    <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
-                      {activeBoard.description}
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={openNewPost}
-                >
-                  글쓰기
-                </button>
-              </div>
-
               {/* 탭 필터 */}
-              <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
-                {(['all', 'pinned'] as const).map((f) => (
+              <div className="pd-filter">
+                <div className="pd-filter-tabs">
                   <button
-                    key={f}
                     type="button"
-                    onClick={() => setFilter(f)}
-                    style={{
-                      padding: '8px 16px',
-                      border: 'none',
-                      borderBottom: filter === f ? '2px solid var(--accent)' : '2px solid transparent',
-                      background: 'none',
-                      color: filter === f ? 'var(--accent)' : 'var(--text-secondary)',
-                      fontWeight: filter === f ? 'var(--fw-bold)' : 'var(--fw-normal)',
-                      fontSize: 'var(--fs-sm)',
-                      cursor: 'pointer',
-                    }}
+                    className={`pd-ftab${filter === 'all' ? ' active' : ''}`}
+                    onClick={() => setFilter('all')}
                   >
-                    {f === 'all' ? '전체' : '공지'}
+                    전체
+                    <span className="pd-ftab-count">{totalPosts}</span>
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    className={`pd-ftab${filter === 'pinned' ? ' active' : ''}`}
+                    onClick={() => setFilter('pinned')}
+                  >
+                    공지
+                    {filter === 'pinned' && (
+                      <span className="pd-ftab-count">{pinnedCount}</span>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* 게시물 테이블 */}
-              {postsLoading ? (
-                <div className="c-empty">
-                  <div className="spinner" style={{ margin: '0 auto 12px' }} />
-                </div>
-              ) : posts.length === 0 ? (
-                <div className="c-empty">
-                  <div className="c-empty-text">게시물이 없습니다.</div>
-                </div>
-              ) : (
-                <table className="c-table" style={{ width: '100%' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ width: '50%' }}>제목</th>
-                      <th>작성자</th>
-                      <th>날짜</th>
-                      <th style={{ textAlign: 'right' }}>조회</th>
-                      <th style={{ width: 60 }}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {posts.map((post) => (
-                      <tr key={post.id}>
-                        <td>
-                          <button
-                            type="button"
+              <div
+                className="card"
+                style={{ border: '1px solid var(--border)', overflow: 'hidden' }}
+              >
+                {postsLoading ? (
+                  <div className="c-empty">
+                    <div className="spinner" style={{ margin: '0 auto 12px' }} />
+                    <div className="c-empty-text">로딩 중...</div>
+                  </div>
+                ) : posts.length === 0 ? (
+                  <div className="c-empty">
+                    <div className="c-empty-icon">📝</div>
+                    <div className="c-empty-text">게시물이 없습니다.</div>
+                  </div>
+                ) : (
+                  <div className="table-wrap">
+                    <table className="c-table">
+                      <thead>
+                        <tr>
+                          <th>제목</th>
+                          <th style={{ width: 120 }}>작성자</th>
+                          <th style={{ width: 100 }}>날짜</th>
+                          <th style={{ width: 80, textAlign: 'right' }}>조회</th>
+                          <th style={{ width: 80, textAlign: 'right' }}>관리</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {posts.map((post) => (
+                          <tr
+                            key={post.id}
+                            style={{ cursor: 'pointer' }}
                             onClick={() => openEditPost(post)}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: 0,
-                              font: 'inherit',
-                              textAlign: 'left',
-                              fontWeight: 'var(--fw-medium)',
-                              color: 'var(--text-primary)',
-                            }}
                           >
-                            {post.isPinned && (
-                              <span
-                                style={{
-                                  display: 'inline-block',
-                                  fontSize: 'var(--fs-xs)',
-                                  color: 'var(--accent)',
-                                  fontWeight: 'var(--fw-bold)',
-                                  marginRight: 6,
-                                  background: 'var(--status-error-bg)',
-                                  padding: '1px 6px',
-                                  borderRadius: 'var(--radius-sm)',
-                                }}
+                            <td style={{ fontWeight: 'var(--fw-semi)' }}>
+                              {post.isPinned && (
+                                <span
+                                  className="c-badge c-badge-accent"
+                                  style={{ marginRight: 6 }}
+                                >
+                                  공지
+                                </span>
+                              )}
+                              {post.title}
+                            </td>
+                            <td style={{ color: 'var(--text-secondary)' }}>
+                              {post.authorName || '—'}
+                            </td>
+                            <td style={{ color: 'var(--text-tertiary)' }}>
+                              {new Date(post.createdAt).toLocaleDateString('ko-KR', {
+                                month: '2-digit',
+                                day: '2-digit',
+                              })}
+                            </td>
+                            <td
+                              style={{
+                                color: 'var(--text-tertiary)',
+                                textAlign: 'right',
+                              }}
+                            >
+                              {post.viewCount}
+                            </td>
+                            <td
+                              style={{ textAlign: 'right' }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                className="btn btn-danger btn-sm"
+                                onClick={() => handleDeletePost(post.id)}
                               >
-                                공지
-                              </span>
-                            )}
-                            {post.title}
-                          </button>
-                        </td>
-                        <td style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>
-                          {post.authorName || '-'}
-                        </td>
-                        <td style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
-                          {new Date(post.createdAt).toLocaleDateString('ko-KR', {
-                            month: '2-digit',
-                            day: '2-digit',
-                          })}
-                        </td>
-                        <td
-                          style={{
-                            fontSize: 'var(--fs-xs)',
-                            color: 'var(--text-tertiary)',
-                            textAlign: 'right',
-                          }}
-                        >
-                          {post.viewCount}
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => handleDeletePost(post.id)}
-                            style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)', padding: '2px 6px' }}
-                          >
-                            삭제
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                                삭제
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
 
               {/* 페이지네이션 */}
               {totalPages > 1 && (
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    gap: 4,
-                    padding: '16px 0',
-                  }}
-                >
+                <div className="bd-pagination">
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                     <button
                       key={p}
@@ -572,103 +501,84 @@ export default function BoardsPage({
         <div className="slide-panel-overlay" onClick={() => setPanelOpen(false)} />
         <div className="slide-panel-content" style={{ width: 'min(640px, 90vw)' }}>
           <div className="slide-panel-header">
-            <h3 className="slide-panel-title">
+            <div className="slide-panel-title">
               {editingPost ? '게시물 수정' : '새 게시물'}
-            </h3>
+            </div>
             <button
               type="button"
-              className="slide-panel-close"
+              className="slide-panel-close btn-icon"
               onClick={() => setPanelOpen(false)}
+              aria-label="닫기"
             >
               ✕
             </button>
           </div>
           <form onSubmit={handleSavePost} className="slide-panel-body">
-              {/* 문의 게시판 — formData 표시 */}
-              {editingPost && isInquiry && editingPost.formData && (
-                <div
-                  className="form-group"
-                  style={{
-                    background: 'var(--bg-secondary)',
-                    padding: 16,
-                    borderRadius: 'var(--radius-md)',
-                    marginBottom: 16,
-                  }}
-                >
-                  <label className="form-label" style={{ marginBottom: 8 }}>
-                    접수 정보
-                  </label>
+            {/* 문의 게시판 — formData 표시 */}
+            {editingPost && isInquiry && editingPost.formData && (
+              <div className="form-group bd-inquiry-data">
+                <label className="form-label">접수 정보</label>
+                <div className="bd-inquiry-list">
                   {Object.entries(editingPost.formData).map(([key, val]) => (
-                    <div
-                      key={key}
-                      style={{
-                        display: 'flex',
-                        gap: 8,
-                        fontSize: 'var(--fs-sm)',
-                        padding: '4px 0',
-                        borderBottom: '1px solid var(--border)',
-                      }}
-                    >
-                      <span style={{ fontWeight: 'var(--fw-medium)', minWidth: 80, color: 'var(--text-secondary)' }}>
-                        {key}
-                      </span>
-                      <span style={{ color: 'var(--text-primary)' }}>{val}</span>
+                    <div key={key} className="bd-inquiry-row">
+                      <span className="bd-inquiry-key">{key}</span>
+                      <span className="bd-inquiry-val">{val}</span>
                     </div>
                   ))}
                 </div>
-              )}
-
-              <div className="form-group">
-                <label className="form-label">제목</label>
-                <input
-                  className="form-input"
-                  value={postTitle}
-                  onChange={(e) => setPostTitle(e.target.value)}
-                  placeholder="제목을 입력하세요"
-                  required
-                />
               </div>
+            )}
 
-              <div className="form-group">
-                <label className="form-label">내용</label>
-                <RichTextEditor
-                  value={postContent}
-                  onChange={setPostContent}
-                  placeholder="내용을 입력하세요..."
-                  minHeight={280}
-                />
-              </div>
+            <div className="form-group">
+              <label className="form-label">제목</label>
+              <input
+                className="form-input"
+                value={postTitle}
+                onChange={(e) => setPostTitle(e.target.value)}
+                placeholder="제목을 입력하세요"
+                required
+              />
+            </div>
 
-              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  type="checkbox"
-                  id="post-pinned"
-                  checked={postPinned}
-                  onChange={(e) => setPostPinned(e.target.checked)}
-                />
-                <label htmlFor="post-pinned" style={{ fontSize: 'var(--fs-sm)', cursor: 'pointer' }}>
-                  공지로 고정
-                </label>
-              </div>
+            <div className="form-group">
+              <label className="form-label">내용</label>
+              <RichTextEditor
+                value={postContent}
+                onChange={setPostContent}
+                placeholder="내용을 입력하세요..."
+                minHeight={280}
+              />
+            </div>
 
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 12 }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setPanelOpen(false)}>
-                  취소
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={postSaving}>
-                  {postSaving ? '저장 중...' : '저장'}
-                </button>
-              </div>
-            </form>
+            <div className="form-group bd-pin-row">
+              <input
+                type="checkbox"
+                id="post-pinned"
+                checked={postPinned}
+                onChange={(e) => setPostPinned(e.target.checked)}
+              />
+              <label htmlFor="post-pinned">공지로 고정</label>
+            </div>
+
+            <div className="bd-form-actions">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setPanelOpen(false)}
+              >
+                취소
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={postSaving}>
+                {postSaving ? '저장 중...' : '저장'}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 
       {/* 사이드바 오버레이 */}
       {sideOpen && (
-        <div
-          className="wb-side-overlay show"
-          onClick={() => setSideOpen(false)}
-        />
+        <div className="wb-side-overlay show" onClick={() => setSideOpen(false)} />
       )}
     </>
   );

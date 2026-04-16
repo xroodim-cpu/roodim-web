@@ -92,54 +92,30 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
       type="button"
       onClick={onClick}
       title={title}
-      style={{
-        background: active ? 'var(--bg-tertiary)' : 'transparent',
-        border: 'none',
-        borderRadius: 'var(--radius-sm)',
-        padding: '4px 6px',
-        cursor: 'pointer',
-        color: active ? 'var(--accent)' : 'var(--text-secondary)',
-        display: 'flex',
-        alignItems: 'center',
-      }}
+      className={`rte-btn${active ? ' is-active' : ''}`}
     >
       {children}
     </button>
   );
 
   return (
-    <div
-      style={{
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-md)',
-        overflow: 'hidden',
-      }}
-    >
+    <div className="rte-wrap">
       {/* 툴바 */}
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 2,
-          padding: '6px 8px',
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--bg-secondary)',
-        }}
-      >
+      <div className="rte-toolbar">
         <Btn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} title="굵게">
           <BoldIcon />
         </Btn>
         <Btn active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} title="기울임">
           <ItalicIcon />
         </Btn>
-        <div style={{ width: 1, background: 'var(--border)', margin: '0 4px' }} />
+        <div className="rte-divider" />
         <Btn active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="제목 H2">
           <H2Icon />
         </Btn>
         <Btn active={editor.isActive('heading', { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} title="제목 H3">
           <H3Icon />
         </Btn>
-        <div style={{ width: 1, background: 'var(--border)', margin: '0 4px' }} />
+        <div className="rte-divider" />
         <Btn active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()} title="목록">
           <ListIcon />
         </Btn>
@@ -149,7 +125,7 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
         <Btn active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()} title="인용">
           <QuoteIcon />
         </Btn>
-        <div style={{ width: 1, background: 'var(--border)', margin: '0 4px' }} />
+        <div className="rte-divider" />
         <Btn active={editor.isActive('link')} onClick={addLink} title="링크">
           <LinkIcon />
         </Btn>
@@ -164,41 +140,11 @@ export default function RichTextEditor({ value, onChange, placeholder, minHeight
       {/* 에디터 본문 */}
       <div
         className="rte-content"
-        style={{ minHeight, padding: '12px 16px', cursor: 'text' }}
+        style={{ minHeight }}
         onClick={() => editor.chain().focus().run()}
       >
         <EditorContent editor={editor} />
       </div>
-
-      {/* 에디터 내부 스타일 */}
-      <style>{`
-        .rte-content .tiptap {
-          outline: none;
-          font-size: var(--fs-sm);
-          color: var(--text-primary);
-          line-height: 1.65;
-        }
-        .rte-content .tiptap p.is-editor-empty:first-child::before {
-          content: attr(data-placeholder);
-          float: left;
-          color: var(--text-tertiary);
-          pointer-events: none;
-          height: 0;
-        }
-        .rte-content .tiptap h2 { font-size: var(--fs-lg); font-weight: var(--fw-bold); margin: 16px 0 8px; }
-        .rte-content .tiptap h3 { font-size: var(--fs-base); font-weight: var(--fw-bold); margin: 12px 0 6px; }
-        .rte-content .tiptap ul, .rte-content .tiptap ol { padding-left: 20px; }
-        .rte-content .tiptap blockquote {
-          border-left: 3px solid var(--border);
-          padding-left: 12px;
-          color: var(--text-secondary);
-          margin: 8px 0;
-        }
-        .rte-content .tiptap a { color: var(--accent); text-decoration: underline; }
-        .rte-content .tiptap img { max-width: 100%; border-radius: var(--radius-sm); margin: 8px 0; }
-        .rte-content .tiptap hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
-        .rte-content .tiptap p { margin: 0 0 8px; }
-      `}</style>
     </div>
   );
 }

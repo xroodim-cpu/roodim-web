@@ -1342,3 +1342,286 @@ img.avatar,
 .c-role-dot-creator  { background: #7c3aed; }
 .c-role-dot-partner  { background: var(--info); }
 .c-role-dot-staff    { background: var(--text-tertiary); }
+
+/* ============================================
+   Boards (게시판) — 전용 보조 스타일
+   (기존 .wb-wrap / .wb-side / .pd-side-group / .pd-filter / .c-table / .c-badge / .slide-panel 재사용)
+   ============================================ */
+.bd-page-wrap {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 0;
+    margin: -24px -40px 0;
+    min-height: calc(100vh - var(--header-height, 60px));
+}
+.bd-side {
+    background: var(--wb-bg-side, var(--bg-secondary));
+    border-right: 1px solid var(--border);
+    padding: 20px 16px;
+    height: calc(100vh - var(--header-height, 60px));
+    position: sticky;
+    top: var(--header-height, 60px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+.bd-main {
+    min-width: 0;
+    padding: 24px 40px 40px;
+    background: var(--bg-secondary);
+}
+.bd-side-heading {
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-bold);
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0 12px 12px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+}
+.bd-side-row {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+.bd-side-btn {
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: none;
+    font: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+.bd-side-btn .bd-side-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.bd-side-pin {
+    font-size: var(--fs-xs);
+    flex-shrink: 0;
+}
+.bd-side-delete {
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 16px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: color .15s, background .15s;
+}
+.bd-side-delete:hover {
+    color: var(--error);
+    background: var(--status-error-bg);
+}
+.bd-side-add {
+    padding: 16px 12px 0;
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
+}
+.bd-side-add-btn { width: 100%; }
+.bd-side-add-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.bd-side-add-actions {
+    display: flex;
+    gap: 6px;
+}
+.bd-side-add-actions .btn { flex: 1; }
+.bd-side-toggle { display: none; }
+
+/* 메인 페이지 헤더 */
+.bd-page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+.bd-page-header-left {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-width: 0;
+}
+
+/* 페이지네이션 */
+.bd-pagination {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    padding: 16px 0;
+}
+
+/* 슬라이드 패널 내부 */
+.bd-inquiry-data {
+    background: var(--bg-secondary);
+    padding: 16px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-light);
+}
+.bd-inquiry-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 8px;
+}
+.bd-inquiry-row {
+    display: flex;
+    gap: 8px;
+    font-size: var(--fs-sm);
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-light);
+}
+.bd-inquiry-row:last-child { border-bottom: none; }
+.bd-inquiry-key {
+    font-weight: var(--fw-medium);
+    min-width: 96px;
+    color: var(--text-secondary);
+}
+.bd-inquiry-val { color: var(--text-primary); flex: 1; }
+.bd-pin-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.bd-pin-row label {
+    font-size: var(--fs-sm);
+    cursor: pointer;
+    margin: 0;
+}
+.bd-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+}
+
+@media (max-width: 768px) {
+    .bd-page-wrap {
+        grid-template-columns: 1fr;
+        margin: -24px -16px 0;
+    }
+    .bd-side {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 280px;
+        z-index: 200;
+        padding: 20px;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+    .bd-side.open { transform: translateX(0); }
+    .bd-main { padding: 16px; }
+    .bd-side-toggle { display: inline-flex; }
+}
+
+/* ============================================
+   Rich Text Editor (TipTap) 스타일
+   ============================================ */
+.rte-wrap {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--bg-primary);
+}
+.rte-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+}
+.rte-btn {
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 6px 8px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .15s, color .15s;
+}
+.rte-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+.rte-btn.is-active {
+    background: var(--bg-tertiary);
+    color: var(--accent);
+}
+.rte-divider {
+    width: 1px;
+    height: 18px;
+    background: var(--border);
+    margin: 0 4px;
+}
+.rte-content {
+    padding: 12px 16px;
+    cursor: text;
+}
+.rte-content .tiptap {
+    outline: none;
+    font-size: var(--fs-sm);
+    color: var(--text-primary);
+    line-height: 1.65;
+}
+.rte-content .tiptap p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: var(--text-tertiary);
+    pointer-events: none;
+    height: 0;
+}
+.rte-content .tiptap h2 {
+    font-size: var(--fs-lg);
+    font-weight: var(--fw-bold);
+    margin: 16px 0 8px;
+}
+.rte-content .tiptap h3 {
+    font-size: var(--fs-base);
+    font-weight: var(--fw-bold);
+    margin: 12px 0 6px;
+}
+.rte-content .tiptap ul,
+.rte-content .tiptap ol {
+    padding-left: 20px;
+}
+.rte-content .tiptap blockquote {
+    border-left: 3px solid var(--border);
+    padding-left: 12px;
+    color: var(--text-secondary);
+    margin: 8px 0;
+}
+.rte-content .tiptap a {
+    color: var(--accent);
+    text-decoration: underline;
+}
+.rte-content .tiptap img {
+    max-width: 100%;
+    border-radius: var(--radius-sm);
+    margin: 8px 0;
+}
+.rte-content .tiptap hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 16px 0;
+}
+.rte-content .tiptap p { margin: 0 0 8px; }
