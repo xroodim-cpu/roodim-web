@@ -72,6 +72,7 @@ export default function SettingsManager({ slug }: { slug: string }) {
   const [vercelEnabled, setVercelEnabled] = useState(true);
   const [vercelError, setVercelError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [gabiaPartnerUrl, setGabiaPartnerUrl] = useState('');
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
@@ -102,12 +103,14 @@ export default function SettingsManager({ slug }: { slug: string }) {
     verificationRecords?: VerificationRecord[];
     vercelEnabled?: boolean;
     vercelError?: string;
+    gabiaPartnerUrl?: string;
   }) {
     setDomainValue(data.customDomain || '');
     setDomainStatus(data.status ?? null);
     setVerificationRecords(data.verificationRecords || []);
     setVercelEnabled(data.vercelEnabled !== false);
     setVercelError(data.vercelError || null);
+    if (typeof data.gabiaPartnerUrl === 'string') setGabiaPartnerUrl(data.gabiaPartnerUrl);
   }
 
   // Fetch domain when domain tab is active
@@ -298,6 +301,27 @@ export default function SettingsManager({ slug }: { slug: string }) {
                     {!vercelEnabled && ' · Vercel API 미연동 — DNS 수동 설정 필요.'}
                   </p>
                 </div>
+
+                {/* 가비아 도메인 구매 CTA — 마스터관리에 URL 이 등록돼 있고 아직 도메인이 비어있을 때만 */}
+                {gabiaPartnerUrl && !domainValue && (
+                  <a
+                    href={gabiaPartnerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg p-4 hover:border-indigo-300 hover:shadow-sm transition group"
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-indigo-900">아직 도메인이 없으신가요?</p>
+                        <p className="mt-0.5 text-xs text-indigo-700">가비아에서 .com · .kr · .co.kr 도메인을 쉽게 구매하세요.</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 group-hover:text-indigo-700 whitespace-nowrap">
+                        <span>가비아에서 구매</span>
+                        <svg className="w-4 h-4 transition group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                      </div>
+                    </div>
+                  </a>
+                )}
 
                 {/* 상태별 안내 박스 */}
                 {domainStatus === 'verified' && (

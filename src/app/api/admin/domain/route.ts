@@ -11,6 +11,7 @@ import {
   interpretStatus,
   type VerificationRecord,
 } from '@/lib/vercel-api';
+import { getPlatformPublicSettings } from '@/lib/platform-settings';
 
 // Domain format validation
 function isValidDomain(domain: string): boolean {
@@ -55,6 +56,9 @@ export async function GET(request: NextRequest) {
   const site = rows[0];
   if (!site) return NextResponse.json({ error: 'Site not found' }, { status: 404 });
 
+  // 가비아 제휴 URL — Laravel 마스터관리 > API 에서 관리자가 입력. 빈 값이면 UI 에서 CTA 숨김.
+  const { gabiaPartnerUrl } = await getPlatformPublicSettings();
+
   // Vercel API 가 비활성이면 manual 상태로 응답
   if (!isVercelApiEnabled()) {
     return NextResponse.json({
@@ -65,6 +69,7 @@ export async function GET(request: NextRequest) {
         verifiedAt: site.customDomainVerifiedAt,
         verificationRecords: manualRecords(site.customDomain),
         vercelEnabled: false,
+        gabiaPartnerUrl,
       },
     });
   }
@@ -79,6 +84,7 @@ export async function GET(request: NextRequest) {
         verifiedAt: null,
         verificationRecords: [],
         vercelEnabled: true,
+        gabiaPartnerUrl,
       },
     });
   }
@@ -117,6 +123,7 @@ export async function GET(request: NextRequest) {
       verificationRecords: records,
       vercelEnabled: true,
       vercelError: vercelResp.ok ? undefined : vercelResp.error,
+      gabiaPartnerUrl,
     },
   });
 }
