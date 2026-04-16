@@ -127,12 +127,11 @@ export async function renderSiteFile(
     (_m, prefix, rest) => stripLeadingSlash(prefix, rest)
   );
 
-  // 5. <head> 자동 주입 (base 태그 + style.css fallback)
+  // 5. <head> 자동 주입 (base 태그 + style.css fallback + SEO 메타 태그)
   // 목적:
   //  - <base> : 상대경로 에셋 해결 (이미지/링크 등)
   //  - style.css 자동 link: 스킨 HTML 템플릿이 CSS 링크를 누락해도 동작 보장
-  //    (브랜드온도 스킨 사례: web_skin_files.style.css 는 있지만 index.html 에
-  //     <link rel="stylesheet"> 태그가 빠져있어 화면이 무스타일로 나오던 문제)
+  //  - SEO 메타 태그: 스킨에 없으면 site_configs.seo 기반으로 자동 주입
   const needsBase = !/<base\s/i.test(html);
   const alreadyLinksLocalCss = /<link[^>]*rel=["']?stylesheet[^>]*href=["']?(?!https?:|\/\/)[^"'>]*\.css/i.test(html);
 
@@ -141,12 +140,46 @@ export async function renderSiteFile(
     headInjection += `\n    <base href="/${slug}/">`;
   }
   if (!alreadyLinksLocalCss) {
-    // style.css 가 실제 web_skin_files / site_files 에 존재할 때만 주입
     const cssFile = await getFileContent(siteId, 'style.css');
     if (cssFile) {
       headInjection += `\n    <link rel="stylesheet" href="style.css">`;
     }
   }
+
+  // SEO 메타 태그 자동 주입 (스킨에 없는 항목만)
+  const seoConfig = (configs.seo || {}) as Record<string, string>;
+  const baseConfig = (configs.base || {}) as Record<string, string>;
+
+  const metaTitle = seoConfig.meta_title || baseConfig.site_name || baseConfig.title || '';
+  const metaDesc = seoConfig.meta_description || baseConfig.description || '';
+  const metaKeywords = seoConfig.meta_keywords || '';
+  const ogTitle = seoConfig.og_title || metaTitle;
+  const ogDesc = seoConfig.og_description || metaDesc;
+  const ogImage = resolveAssetUrl(seoConfig.og_image || '');
+  const faviconUrl = resolveAssetUrl(seoConfig.favicon_url || '');
+
+  if (metaTitle && !/<title[^>]*>/i.test(html)) {
+    headInjection += `\n    <title>${metaTitle}</title>`;
+  }
+  if (metaDesc && !/<meta[^>]*name=["']description/i.test(html)) {
+    headInjection += `\n    <meta name="description" content="${metaDesc}">`;
+  }
+  if (metaKeywords && !/<meta[^>]*name=["']keywords/i.test(html)) {
+    headInjection += `\n    <meta name="keywords" content="${metaKeywords}">`;
+  }
+  if (ogTitle && !/<meta[^>]*property=["']og:title/i.test(html)) {
+    headInjection += `\n    <meta property="og:title" content="${ogTitle}">`;
+  }
+  if (ogDesc && !/<meta[^>]*property=["']og:description/i.test(html)) {
+    headInjection += `\n    <meta property="og:description" content="${ogDesc}">`;
+  }
+  if (ogImage && !/<meta[^>]*property=["']og:image/i.test(html)) {
+    headInjection += `\n    <meta property="og:image" content="${ogImage}">`;
+  }
+  if (faviconUrl && !/<link[^>]*rel=["'](?:icon|shortcut icon)/i.test(html)) {
+    headInjection += `\n    <link rel="icon" href="${faviconUrl}">`;
+  }
+
   if (headInjection) {
     html = html.replace(/<head(\s[^>]*)?>/i, (m) => `${m}${headInjection}`);
   }
@@ -223,6 +256,7 @@ async function applyVariables(ctx: TemplateContext, html: string): Promise<strin
   const base = (ctx.configs.base || {}) as Record<string, string>;
   const headerfooter = (ctx.configs.headerfooter || {}) as Record<string, string>;
   const design = (ctx.configs.design || {}) as Record<string, string>;
+  const seo = (ctx.configs.seo || {}) as Record<string, string>;
 
   // Owner 정보 로드
   const owners = await db.select()
@@ -268,6 +302,16 @@ async function applyVariables(ctx: TemplateContext, html: string): Promise<strin
     // 사이트 URL
     'SITE_URL': `/${ctx.slug}`,
     'SLUG': ctx.slug,
+
+    // SEO / 마케팅
+    'META_TITLE': seo.meta_title || base.site_name || base.title || '',
+    'META_DESC': seo.meta_description || base.description || '',
+    'META_KEYWORDS': seo.meta_keywords || '',
+    'OG_TITLE': seo.og_title || seo.meta_title || base.site_name || '',
+    'OG_DESC': seo.og_description || seo.meta_description || '',
+    'OG_IMAGE': resolveAssetUrl(seo.og_image || ''),
+    'FAVICON_URL': resolveAssetUrl(seo.favicon_url || ''),
+    'SNS_SHARE_IMAGE': resolveAssetUrl(seo.sns_share_image || seo.og_image || ''),
   };
 
   let result = html;
@@ -495,6 +539,15 @@ export function getAvailableVariables(): { code: string; description: string; ca
     // 사이트
     { code: '{{SITE_URL}}', description: '사이트 기본 경로', category: '사이트' },
     { code: '{{SLUG}}', description: '사이트 슬러그', category: '사이트' },
+    // SEO / 마케팅
+    { code: '{{META_TITLE}}', description: '메타 타이틀', category: 'SEO' },
+    { code: '{{META_DESC}}', description: '메타 설명', category: 'SEO' },
+    { code: '{{META_KEYWORDS}}', description: '메타 키워드', category: 'SEO' },
+    { code: '{{OG_TITLE}}', description: 'OG 타이틀 (SNS 공유 제목)', category: 'SEO' },
+    { code: '{{OG_DESC}}', description: 'OG 설명 (SNS 공유 설명)', category: 'SEO' },
+    { code: '{{OG_IMAGE}}', description: 'OG 이미지 URL (SNS 공유 이미지)', category: 'SEO' },
+    { code: '{{FAVICON_URL}}', description: '파비콘 이미지 URL', category: 'SEO' },
+    { code: '{{SNS_SHARE_IMAGE}}', description: 'SNS 공유 이미지 URL', category: 'SEO' },
     // 배너 치환코드
     { code: '{#img_N}', description: '배너 N번 이미지 URL', category: '배너' },
     { code: '{#text_N}', description: '배너 N번 텍스트', category: '배너' },

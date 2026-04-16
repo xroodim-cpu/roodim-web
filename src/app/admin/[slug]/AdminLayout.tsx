@@ -58,6 +58,7 @@ const TOP_MENUS: TopMenu[] = [
     href: '/site',
     subMenus: [
       { key: 'info', label: '기본정보', href: '/site' },
+      { key: 'seo', label: 'SEO/마케팅', href: '/site/seo' },
       { key: 'sections', label: '섹션 관리', href: '/site/sections' },
       { key: 'menus', label: '메뉴 관리', href: '/site/menus' },
     ],
