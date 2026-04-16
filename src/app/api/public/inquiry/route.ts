@@ -1,29 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { after } from 'next/server';
 import { db } from '@/lib/db';
 import { sites, boards, boardPosts } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
 import { ensureSystemBoards } from '@/lib/board-utils';
-import { adminApi } from '@/lib/admin-api';
 
 /**
  * POST /api/public/inquiry
  *
- * 공개 문의 접수 API (인증 불필요)
- * 홈페이지 문의 팝업 → 문의게시판에 "항목명 : 입력값" 형식으로 저장
+ * 공개 문의 접수 API (인증 불필요). 홈페이지 상담팝업 → 사이트별 문의게시판 (roodim-web DB).
  *
- * Body: { slug: "org-5", fields: { "병원명": "호재한의원", "성함(직책)": "대표원장 손호재", ... } }
+ * 두 가지 body 포맷 지원:
+ *
+ * 1) 통합 텍스트 모드 (신규 — 공용 치환코드 `<form class="roo-inquiry">` 및 최신
+ *    `<!--@inquiry_form-->` 위젯에서 사용):
+ *      { slug, content, mode: 'unified' }
+ *    - `content` 는 이미 `<p><strong>라벨</strong>: 값</p>` 형태로 합쳐진 HTML
+ *    - 그대로 boardPosts.content 에 저장. title 은 content 에서 자동 추출
+ *
+ * 2) 구조화 필드 모드 (레거시 — 하위호환):
+ *      { slug, fields: { "성함": "...", "연락처": "...", ... } }
+ *    - 각 필드에서 성함/연락처/이메일 키워드 매칭해 컬럼에 저장
+ *    - content 는 자동 생성
+ *
+ * 저장 위치는 roodim-web DB (사이트별 데이터 단위). 루딤링크(Laravel) 미러는
+ * 엔드포인트 미구현 + 저장 정책 단일화로 제거됨.
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { slug, fields } = body;
+    const { slug, fields, content, mode } = body;
 
     if (!slug) {
       return NextResponse.json({ error: 'slug is required' }, { status: 400 });
     }
-    if (!fields || typeof fields !== 'object' || Object.keys(fields).length === 0) {
-      return NextResponse.json({ error: 'fields is required (object with key-value pairs)' }, { status: 400 });
+
+    const useUnified = mode === 'unified' || (typeof content === 'string' && content.trim().length > 0);
+    const hasFields = fields && typeof fields === 'object' && Object.keys(fields).length > 0;
+
+    if (!useUnified && !hasFields) {
+      return NextResponse.json(
+        { error: 'content(unified) 또는 fields 중 하나는 필수입니다.' },
+        { status: 400 },
+      );
     }
 
     // 사이트 조회
@@ -48,49 +66,57 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '문의게시판을 찾을 수 없습니다.' }, { status: 500 });
     }
 
-    // 필드에서 주요 정보 추출
-    const fieldEntries = Object.entries(fields) as [string, string][];
-    const authorName = extractField(fieldEntries, ['성함', '이름', '담당자', 'name', '성명']) || '방문자';
-    const authorPhone = extractField(fieldEntries, ['연락처', '전화', '핸드폰', '휴대폰', 'phone', '전화번호']);
-    const authorEmail = extractField(fieldEntries, ['이메일', 'email', 'e-mail']);
-    const companyName = extractField(fieldEntries, ['병원명', '회사명', '업체명', '상호', 'company']);
+    let finalTitle: string;
+    let finalContent: string;
+    let authorName: string;
+    let authorPhone: string | null = null;
+    let authorEmail: string | null = null;
+    let formDataDump: Record<string, unknown> | null = null;
 
-    // 제목 생성
-    const titleParts = [companyName, authorName].filter(Boolean);
-    const title = `문의 — ${titleParts.join(' / ') || '익명'}`;
+    if (useUnified) {
+      // ── 통합 텍스트 모드 ──
+      finalContent = String(content).trim();
+      formDataDump = { __mode: 'unified', __rawLength: finalContent.length };
 
-    // 내용: "항목명 : 입력값" 형식 HTML
-    const contentHtml = fieldEntries
-      .map(([key, val]) => `<p><strong>${escapeHtml(key)}</strong> : ${escapeHtml(String(val))}</p>`)
-      .join('\n');
+      // content 에서 선택적 파싱 — 어드민 정렬/검색용. 실패해도 저장은 진행
+      const textOnly = stripHtml(finalContent);
+      authorName = extractFromText(textOnly, ['성함', '이름', '담당자', '성명', 'name']) || '방문자';
+      authorPhone = extractFromText(textOnly, ['연락처', '전화', '핸드폰', '휴대폰', '전화번호', 'phone']);
+      authorEmail = extractFromText(textOnly, ['이메일', 'email', 'e-mail']);
+      const companyName = extractFromText(textOnly, ['병원명', '회사명', '업체명', '상호', 'company']);
+
+      // title 추출 — 첫 번째 `<p><strong>...</strong>: 값` 의 값에서 최대 50자
+      const firstValueMatch = finalContent.match(/<strong>[^<]*<\/strong>\s*:\s*([^<]+)/);
+      const firstValue = firstValueMatch?.[1]?.trim() || '';
+      const titleSeed = [companyName, authorName].filter(Boolean).join(' / ') || firstValue.slice(0, 50);
+      finalTitle = titleSeed ? `문의 — ${titleSeed}` : `상담 요청 — ${new Date().toLocaleString('ko-KR')}`;
+    } else {
+      // ── 구조화 필드 모드 (레거시) ──
+      const fieldEntries = Object.entries(fields) as [string, string][];
+      authorName = extractField(fieldEntries, ['성함', '이름', '담당자', 'name', '성명']) || '방문자';
+      authorPhone = extractField(fieldEntries, ['연락처', '전화', '핸드폰', '휴대폰', 'phone', '전화번호']);
+      authorEmail = extractField(fieldEntries, ['이메일', 'email', 'e-mail']);
+      const companyName = extractField(fieldEntries, ['병원명', '회사명', '업체명', '상호', 'company']);
+
+      const titleParts = [companyName, authorName].filter(Boolean);
+      finalTitle = `문의 — ${titleParts.join(' / ') || '익명'}`;
+      finalContent = fieldEntries
+        .map(([key, val]) => `<p><strong>${escapeHtml(key)}</strong> : ${escapeHtml(String(val))}</p>`)
+        .join('\n');
+      formDataDump = fields;
+    }
 
     // 게시물 생성
     const [post] = await db.insert(boardPosts).values({
       boardId: inquiryBoard.id,
       siteId: site.id,
-      title,
-      content: contentHtml,
+      title: finalTitle,
+      content: finalContent,
       authorName,
       authorEmail: authorEmail || null,
       authorPhone: authorPhone || null,
-      formData: fields,
+      formData: formDataDump,
     }).returning();
-
-    // 루딤링크(Laravel 어드민) 에도 미러링 — 응답 후 background 실행.
-    //
-    // [NOTE] Next.js 16 의 `after()` 를 사용. Vercel 서버리스 함수는 응답 반환 시
-    // 일반 Promise 를 종료시키므로 fire-and-forget (단순 .catch) 패턴은
-    // 미러링 요청을 중도 취소한다. `after()` 는 Vercel 이 응답 후에도 실행을 보장.
-    after(async () => {
-      const result = await adminApi(
-        'POST',
-        `/api/sites/${encodeURIComponent(slug)}/bulletins/inquiry/submit`,
-        { fields }
-      );
-      if (!result.ok) {
-        console.warn('[inquiry mirror → laravel] failed:', result.error, 'slug=', slug);
-      }
-    });
 
     return NextResponse.json({
       ok: true,
@@ -103,9 +129,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/**
- * 필드 목록에서 키워드 매칭으로 값 추출
- */
+/** fields 객체에서 키워드 매칭으로 값 추출 */
 function extractField(entries: [string, string][], keywords: string[]): string | null {
   for (const [key, val] of entries) {
     const lower = key.toLowerCase();
@@ -116,6 +140,35 @@ function extractField(entries: [string, string][], keywords: string[]): string |
     }
   }
   return null;
+}
+
+/**
+ * 통합 텍스트 본문(HTML 제거 후 plain)에서 `라벨: 값` 패턴을 찾아 값을 추출.
+ * 여러 줄에 걸쳐 있을 수 있어서 라벨 등장 후 다음 줄바꿈까지 또는 다음 라벨 전까지를 값으로 본다.
+ */
+function extractFromText(text: string, keywords: string[]): string | null {
+  for (const kw of keywords) {
+    const re = new RegExp(
+      `(?:^|[\\n\\r])\\s*${kw.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s*[:：]\\s*([^\\n\\r]+)`,
+      'i',
+    );
+    const m = text.match(re);
+    if (m && m[1]) return m[1].trim();
+  }
+  return null;
+}
+
+/** 매우 단순한 HTML→텍스트 변환 — 파싱용이라 정확도 < 내구성 */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"');
 }
 
 function escapeHtml(str: string): string {

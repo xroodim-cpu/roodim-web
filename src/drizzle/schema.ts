@@ -399,6 +399,11 @@ export const boardPosts = pgTable('board_posts', {
   isVisible: boolean('is_visible').default(true).notNull(),
   isPinned: boolean('is_pinned').default(false).notNull(),
   viewCount: integer('view_count').default(0).notNull(),
+  // ── 답변(reply) — 문의게시판 전용 ──
+  // 회원(사이트 주인) 어드민에서 작성. 공개 사이트에는 노출 안 함 (방문자 비노출 정책).
+  replyContent: text('reply_content'),                   // 어드민 답변 HTML
+  repliedAt: timestamp('replied_at'),                    // 첫 답변 작성 시각
+  repliedBy: varchar('replied_by', { length: 100 }),     // 답변 작성 어드민 이름
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => [

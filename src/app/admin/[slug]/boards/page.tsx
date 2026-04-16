@@ -28,6 +28,10 @@ interface Post {
   isVisible: boolean;
   isPinned: boolean;
   viewCount: number;
+  // 문의게시판 답변 (inquiry 한정 — 공개 노출 안 함)
+  replyContent?: string | null;
+  repliedAt?: string | null;
+  repliedBy?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -55,6 +59,9 @@ export default function BoardsPage({
   const [postContent, setPostContent] = useState('');
   const [postPinned, setPostPinned] = useState(false);
   const [postSaving, setPostSaving] = useState(false);
+  // 문의게시판 답변 (inquiry 한정)
+  const [postReplyContent, setPostReplyContent] = useState('');
+  const [replySaving, setReplySaving] = useState(false);
 
   // 게시판 추가 모달
   const [showAddBoard, setShowAddBoard] = useState(false);
@@ -169,6 +176,7 @@ export default function BoardsPage({
     setPostTitle('');
     setPostContent('');
     setPostPinned(false);
+    setPostReplyContent('');
     setPanelOpen(true);
   }
 
@@ -177,7 +185,59 @@ export default function BoardsPage({
     setPostTitle(post.title);
     setPostContent(post.content || '');
     setPostPinned(post.isPinned);
+    setPostReplyContent(post.replyContent || '');
     setPanelOpen(true);
+  }
+
+  /**
+   * 문의 답변 저장 — 본문 수정과 분리된 엔드포인트 호출.
+   * `replyContent` 만 보내 PUT 이 해당 필드 + replied_at/by 만 갱신하게 함.
+   */
+  async function handleSaveReply() {
+    if (!slug || !activeBoardId || !editingPost) return;
+    setReplySaving(true);
+    try {
+      const res = await fetch(
+        `/api/admin/boards/${activeBoardId}/posts/${editingPost.id}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug, replyContent: postReplyContent }),
+        },
+      );
+      const data = await res.json();
+      if (res.ok) {
+        // 로컬 상태 갱신 — 목록에 뱃지 바로 반영
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.id === editingPost.id
+              ? {
+                  ...p,
+                  replyContent: data.post?.replyContent ?? postReplyContent,
+                  repliedAt: data.post?.repliedAt ?? new Date().toISOString(),
+                  repliedBy: data.post?.repliedBy ?? null,
+                }
+              : p,
+          ),
+        );
+        setEditingPost((prev) =>
+          prev
+            ? {
+                ...prev,
+                replyContent: data.post?.replyContent ?? postReplyContent,
+                repliedAt: data.post?.repliedAt ?? new Date().toISOString(),
+                repliedBy: data.post?.repliedBy ?? null,
+              }
+            : prev,
+        );
+      } else {
+        alert(data.error || '답변 저장 실패');
+      }
+    } catch {
+      alert('답변 저장 실패');
+    } finally {
+      setReplySaving(false);
+    }
   }
 
   async function handleSavePost(e: FormEvent) {
@@ -437,6 +497,31 @@ export default function BoardsPage({
                                   공지
                                 </span>
                               )}
+                              {isInquiry && (
+                                post.replyContent ? (
+                                  <span
+                                    className="c-badge"
+                                    style={{
+                                      marginRight: 6,
+                                      background: '#e8f5e9',
+                                      color: '#2e7d32',
+                                    }}
+                                  >
+                                    ✓ 답변완료
+                                  </span>
+                                ) : (
+                                  <span
+                                    className="c-badge"
+                                    style={{
+                                      marginRight: 6,
+                                      background: '#fff3e0',
+                                      color: '#e65100',
+                                    }}
+                                  >
+                                    ⏳ 미답변
+                                  </span>
+                                )
+                              )}
                               {post.title}
                             </td>
                             <td style={{ color: 'var(--text-secondary)' }}>
@@ -559,6 +644,61 @@ export default function BoardsPage({
               />
               <label htmlFor="post-pinned">공지로 고정</label>
             </div>
+
+            {/* 문의 답변 — inquiry 게시판 & 기존 글 수정 시에만 */}
+            {editingPost && isInquiry && (
+              <div
+                className="form-group"
+                style={{
+                  borderTop: '1px solid var(--border)',
+                  paddingTop: 20,
+                  marginTop: 8,
+                }}
+              >
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>답변</span>
+                  {editingPost.repliedAt && (
+                    <span
+                      className="c-badge"
+                      style={{
+                        background: '#e8f5e9',
+                        color: '#2e7d32',
+                        fontSize: 11,
+                        fontWeight: 'normal',
+                      }}
+                    >
+                      {new Date(editingPost.repliedAt).toLocaleString('ko-KR')}
+                      {editingPost.repliedBy ? ` · ${editingPost.repliedBy}` : ''}
+                    </span>
+                  )}
+                </label>
+                <RichTextEditor
+                  value={postReplyContent}
+                  onChange={setPostReplyContent}
+                  placeholder="답변을 입력하세요. (공개 사이트에는 노출되지 않습니다)"
+                  minHeight={200}
+                />
+                <p
+                  style={{
+                    margin: '6px 0 0',
+                    fontSize: 12,
+                    color: 'var(--text-tertiary)',
+                  }}
+                >
+                  답변은 어드민에서만 확인됩니다. 방문자에게는 노출되지 않습니다.
+                </p>
+                <div style={{ marginTop: 10, textAlign: 'right' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={handleSaveReply}
+                    disabled={replySaving}
+                  >
+                    {replySaving ? '저장 중...' : '답변 저장'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="bd-form-actions">
               <button

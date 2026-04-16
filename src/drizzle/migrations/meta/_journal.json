@@ -29,6 +29,13 @@
       "when": 1776508800000,
       "tag": "0003_custom_domain_status",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776595200000,
+      "tag": "0004_board_post_reply",
+      "breakpoints": true
     }
   ]
 }

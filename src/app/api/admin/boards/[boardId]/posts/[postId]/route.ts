@@ -45,12 +45,19 @@ export async function GET(req: NextRequest, { params }: Params) {
 
 /**
  * PUT /api/admin/boards/[boardId]/posts/[postId]
+ *
+ * body: { slug, title?, content?, authorName?, isPinned?, isVisible?, replyContent? }
+ *
+ * `replyContent` 가 포함되면 문의게시판 답변으로 처리 —
+ *   - 첫 답변(기존 replied_at 이 null) 일 때만 replied_at 세팅
+ *   - replied_by 는 현재 어드민 세션의 name 으로 항상 업데이트
+ *   - 공개 사이트엔 노출되지 않음 (방문자 비노출 정책)
  */
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
     const { boardId, postId } = await params;
     const body = await req.json();
-    const { slug: siteSlug, title, content, authorName, isPinned, isVisible } = body;
+    const { slug: siteSlug, title, content, authorName, isPinned, isVisible, replyContent } = body;
 
     if (!siteSlug) return NextResponse.json({ error: 'slug is required' }, { status: 400 });
 
@@ -63,6 +70,25 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (authorName !== undefined) updates.authorName = authorName;
     if (isPinned !== undefined) updates.isPinned = isPinned;
     if (isVisible !== undefined) updates.isVisible = isVisible;
+
+    // 답변 처리 — replyContent 가 명시적으로 포함될 때만
+    if (replyContent !== undefined) {
+      updates.replyContent = replyContent;
+      updates.repliedBy = session.name || 'admin';
+      // 첫 답변일 때만 repliedAt 세팅 (기존 레코드 조회)
+      const [existing] = await db
+        .select({ repliedAt: boardPosts.repliedAt })
+        .from(boardPosts)
+        .where(and(
+          eq(boardPosts.id, Number(postId)),
+          eq(boardPosts.boardId, Number(boardId)),
+          eq(boardPosts.siteId, session.site_id),
+        ))
+        .limit(1);
+      if (existing && !existing.repliedAt) {
+        updates.repliedAt = new Date();
+      }
+    }
 
     const [row] = await db
       .update(boardPosts)

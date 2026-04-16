@@ -574,12 +574,108 @@ async function processBannerLoops(
 }
 
 /**
+ * `form.roo-inquiry` 에 바인딩되는 제출 핸들러 스크립트.
+ *
+ * 영역 = `<form class="roo-inquiry">` 요소. 그 안의 모든 label + input/textarea/select
+ * 쌍을 순회해 `<p><strong>라벨</strong>: 값</p>` HTML 로 합치고, `{slug, content, mode:'unified'}`
+ * 로 `/api/public/inquiry` 에 POST. 스킨이 어느 사이트에서 렌더되든 `${slug}` 는 이미
+ * 상위 라우터가 호스트→slug 해석을 마친 뒤 주입해 줘서 자동 사이트 감지가 성립함.
+ *
+ * 한 페이지에 여러 form.roo-inquiry 가 있어도 한 번만 바인딩되도록 window 플래그로 보호.
+ */
+function rooInquiryScript(slug: string): string {
+  return `<script>
+(function(){
+  if (window.__roo_inquiry_bound) return;
+  window.__roo_inquiry_bound = true;
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function gather(form){
+    var lines = [];
+    var labels = Array.prototype.slice.call(form.querySelectorAll('label'));
+    var used = new Set();
+    // 1) label[for=id] + 해당 control
+    labels.forEach(function(lbl){
+      var forId = lbl.getAttribute('for');
+      var ctl = forId ? form.querySelector('#' + CSS.escape(forId)) : lbl.querySelector('input,textarea,select');
+      if (!ctl || used.has(ctl)) return;
+      used.add(ctl);
+      var label = (lbl.textContent || '').trim();
+      var value = (ctl.type === 'checkbox' || ctl.type === 'radio')
+        ? (ctl.checked ? (ctl.value || '체크됨') : '')
+        : (ctl.value || '').trim();
+      if (!label && !value) return;
+      lines.push('<p><strong>' + esc(label) + '</strong>: ' + esc(value).replace(/\\n/g,'<br>') + '</p>');
+    });
+    // 2) label 이 없는 나머지 control — name 기반
+    form.querySelectorAll('input,textarea,select').forEach(function(ctl){
+      if (used.has(ctl)) return;
+      if (ctl.type === 'submit' || ctl.type === 'button' || ctl.type === 'hidden') return;
+      used.add(ctl);
+      var label = (ctl.getAttribute('placeholder') || ctl.name || '').trim();
+      var value = (ctl.type === 'checkbox' || ctl.type === 'radio')
+        ? (ctl.checked ? (ctl.value || '체크됨') : '')
+        : (ctl.value || '').trim();
+      if (!label && !value) return;
+      lines.push('<p><strong>' + esc(label) + '</strong>: ' + esc(value).replace(/\\n/g,'<br>') + '</p>');
+    });
+    return lines.join('\\n');
+  }
+  function bind(form){
+    if (form.__roo_bound) return;
+    form.__roo_bound = true;
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      var btn = form.querySelector('button[type="submit"],input[type="submit"],.roo-inquiry-submit');
+      var msg = form.querySelector('#roo-inquiry-msg') || document.getElementById('roo-inquiry-msg');
+      if (btn) { btn.disabled = true; var origText = btn.textContent; btn.textContent = '접수 중...'; }
+      var content = gather(form);
+      if (!content) {
+        if (msg) { msg.style.display='block'; msg.style.background='#fce4ec'; msg.style.color='#c62828'; msg.textContent='입력된 내용이 없습니다.'; }
+        if (btn) { btn.disabled = false; btn.textContent = origText || '문의 접수'; }
+        return;
+      }
+      fetch('/api/public/inquiry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: '${slug}', content: content, mode: 'unified' })
+      }).then(function(r){ return r.json(); }).then(function(data){
+        if (data.ok) {
+          if (msg) { msg.style.display='block'; msg.style.background='#e8f5e9'; msg.style.color='#2e7d32'; msg.textContent='문의가 접수되었습니다. 빠른 시일 내에 답변드리겠습니다.'; }
+          else { alert('문의가 접수되었습니다.'); }
+          form.reset();
+          var modal = document.getElementById('roo-inquiry-modal');
+          if (modal) setTimeout(function(){ modal.style.display='none'; if (msg) msg.style.display='none'; }, 2500);
+        } else {
+          if (msg) { msg.style.display='block'; msg.style.background='#fce4ec'; msg.style.color='#c62828'; msg.textContent = data.error || '접수 실패. 다시 시도해주세요.'; }
+          else { alert(data.error || '접수 실패'); }
+        }
+      }).catch(function(){
+        if (msg) { msg.style.display='block'; msg.style.background='#fce4ec'; msg.style.color='#c62828'; msg.textContent='네트워크 오류. 다시 시도해주세요.'; }
+        else { alert('네트워크 오류'); }
+      }).finally(function(){
+        if (btn) { btn.disabled = false; btn.textContent = origText || '문의 접수'; }
+      });
+    });
+  }
+  function init(){
+    document.querySelectorAll('form.roo-inquiry').forEach(bind);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>`;
+}
+
+/**
  * 게시판 치환코드 처리
- * - <!--@inquiry_form--> : 문의 폼 팝업 위젯 (인라인 HTML+JS). 제출 시 로컬 Postgres +
- *                          루딤링크(Laravel) 어드민에 미러링.
+ * - <!--@inquiry_form--> : 자동 모달 + 기본 4개 필드. 제출 시 통합 텍스트로 수집 → roodim-web DB 저장.
+ * - <form class="roo-inquiry"> : 스킨 직접 작성 폼. 동일 수집 스크립트 자동 바인딩. (신규)
  * - <!--@qna_loop-->...<!--@end_qna_loop--> : 로컬 Q&A 반복 출력 (레거시)
- * - <!--@faq_loop-->...<!--@end_faq_loop--> : 루딤링크 Laravel FAQ 게시판 반복 출력 (신규)
- * - <!--@inquiry_list--> : 최근 문의 목록 (로컬 DB)
+ * - <!--@faq_loop-->...<!--@end_faq_loop--> : 루딤링크 Laravel FAQ 게시판 반복 출력
+ * - <!--@inquiry_list--> : 최근 문의 목록 (title 만, 레거시)
  */
 async function processBoardCodes(siteId: string, slug: string, html: string): Promise<string> {
   // ── inquiry_form 위젯 ──
@@ -616,7 +712,7 @@ async function processBoardCodes(siteId: string, slug: string, html: string): Pr
         <h3>문의하기</h3>
         <button type="button" onclick="document.getElementById('roo-inquiry-modal').style.display='none'">&times;</button>
       </div>
-      <form id="roo-inquiry-form" class="roo-inquiry-form">
+      <form id="roo-inquiry-form" class="roo-inquiry roo-inquiry-form">
         <div class="roo-inquiry-fields">
           ${fieldHtml}
         </div>
@@ -646,43 +742,25 @@ async function processBoardCodes(siteId: string, slug: string, html: string): Pr
 .roo-inquiry-submit:hover{opacity:.9}
 .roo-inquiry-submit:disabled{opacity:.5;cursor:not-allowed}
 </style>
-<script>
-(function(){
-  var form=document.getElementById('roo-inquiry-form');
-  if(!form)return;
-  form.addEventListener('submit',function(e){
-    e.preventDefault();
-    var btn=form.querySelector('.roo-inquiry-submit');
-    var msg=document.getElementById('roo-inquiry-msg');
-    btn.disabled=true;btn.textContent='접수 중...';
-    var fields={};
-    form.querySelectorAll('input,textarea').forEach(function(el){
-      if(el.name)fields[el.name]=el.value;
-    });
-    fetch('/api/public/inquiry',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({slug:'${slug}',fields:fields})
-    }).then(function(r){return r.json()}).then(function(data){
-      if(data.ok){
-        msg.style.display='block';msg.style.background='#e8f5e9';msg.style.color='#2e7d32';
-        msg.textContent='문의가 접수되었습니다. 빠른 시일 내에 답변드리겠습니다.';
-        form.reset();
-        setTimeout(function(){document.getElementById('roo-inquiry-modal').style.display='none';msg.style.display='none'},2500);
-      }else{
-        msg.style.display='block';msg.style.background='#fce4ec';msg.style.color='#c62828';
-        msg.textContent=data.error||'접수 실패. 다시 시도해주세요.';
-      }
-    }).catch(function(){
-      msg.style.display='block';msg.style.background='#fce4ec';msg.style.color='#c62828';
-      msg.textContent='네트워크 오류. 다시 시도해주세요.';
-    }).finally(function(){btn.disabled=false;btn.textContent='문의 접수'});
-  });
-})();
-</script>
+${rooInquiryScript(slug)}
 <!-- /문의 폼 위젯 -->`;
 
     html = html.replace('<!--@inquiry_form-->', widget);
+  }
+
+  // ── 스킨이 직접 작성한 form.roo-inquiry 감지 — 수집 스크립트 1회 주입 ──
+  // 스킨 제작자가 `<!--@inquiry_form-->` 대신 자유 레이아웃으로 폼을 짠 경우,
+  // `<form class="roo-inquiry">` 내부의 모든 label + input/textarea/select 값을
+  // 하나의 HTML 본문으로 합쳐서 제출한다. (공통 1개 치환코드, 자동 사이트 감지)
+  if (
+    !html.includes('window.__roo_inquiry_bound') &&
+    /<form\b[^>]*\bclass\s*=\s*["'][^"']*\broo-inquiry\b/i.test(html)
+  ) {
+    html = html.replace('</body>', `${rooInquiryScript(slug)}\n</body>`);
+    // </body> 없는 스킨 대응 — 맨 끝에 추가
+    if (!html.includes('window.__roo_inquiry_bound')) {
+      html += `\n${rooInquiryScript(slug)}`;
+    }
   }
 
   // ── faq_loop (루딤링크 Laravel 어드민 FAQ 게시판에서 로드) ──
