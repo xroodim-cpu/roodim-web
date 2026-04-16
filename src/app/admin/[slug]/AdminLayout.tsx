@@ -3,7 +3,6 @@
 import { ReactNode, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import styles from './AdminLayout.module.css';
 
 interface AdminLayoutProps {
   slug: string;
@@ -30,17 +29,11 @@ const TOP_MENUS: TopMenu[] = [
     key: 'dashboard',
     label: '대시보드',
     href: '/dashboard',
-    subMenus: [
-      { key: 'overview', label: '개요', href: '/dashboard' },
-    ],
   },
   {
     key: 'reservations',
     label: '예약',
     href: '/reservations',
-    subMenus: [
-      { key: 'list', label: '예약 목록', href: '/reservations' },
-    ],
   },
   {
     key: 'work',
@@ -58,9 +51,6 @@ const TOP_MENUS: TopMenu[] = [
     key: 'services',
     label: '시술',
     href: '/services',
-    subMenus: [
-      { key: 'list', label: '시술 목록', href: '/services' },
-    ],
   },
   {
     key: 'site',
@@ -74,6 +64,16 @@ const TOP_MENUS: TopMenu[] = [
   },
 ];
 
+function HamburgerIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  );
+}
+
 export default function AdminLayout({
   slug,
   siteName,
@@ -82,7 +82,8 @@ export default function AdminLayout({
 }: AdminLayoutProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sideOpen, setSideOpen] = useState(false);
 
   const allMenus: TopMenu[] = hasWorkboard
     ? [
@@ -91,7 +92,6 @@ export default function AdminLayout({
           key: 'workboard',
           label: '워크보드',
           href: '/workboard',
-          subMenus: [{ key: 'main', label: '워크보드', href: '/workboard' }],
         },
       ]
     : TOP_MENUS;
@@ -106,6 +106,7 @@ export default function AdminLayout({
   const activeTopKey = getActiveTopKey();
   const activeTop = allMenus.find((m) => m.key === activeTopKey);
   const subMenus = activeTop?.subMenus || [];
+  const hasSubMenus = subMenus.length > 0;
 
   // 사이드바 서브 메뉴 active 판별 (pathname + 쿼리스트링 둘 다 매칭)
   const isSubActive = (subHref: string) => {
@@ -114,12 +115,9 @@ export default function AdminLayout({
     if (pathname !== fullPath) return false;
 
     if (!hrefQuery) {
-      // 서브 href 에 쿼리 없음: 현재 URL 에 status 같은 필터가 없을 때만 active
-      // 그리고 같은 그룹에 status 쿼리를 가진 다른 sub 가 있을 때는 "기본" sub 로 인정
       return !searchParams.toString() || !searchParams.has('status');
     }
 
-    // 서브 href 에 쿼리 있음: 모든 키·값이 정확히 일치해야 함
     const expected = new URLSearchParams(hrefQuery);
     for (const [k, v] of expected.entries()) {
       if (searchParams.get(k) !== v) return false;
@@ -127,80 +125,129 @@ export default function AdminLayout({
     return true;
   };
 
+  const brandInitial = (siteName?.charAt(0) || 'R').toUpperCase();
+
   return (
-    <div className={styles.adminContainer}>
-      {/* 상단 헤더 + 주메뉴 */}
-      <header className={styles.topnav}>
-        <div className={styles.topnavInner}>
-          <button
-            className={styles.drawerToggle}
-            onClick={() => setDrawerOpen(!drawerOpen)}
-            aria-label="메뉴"
+    <>
+      {/* 상단 메인 네비게이션 */}
+      <nav className="topnav">
+        <div className="topnav-inner">
+          {hasSubMenus && (
+            <button
+              type="button"
+              className="topnav-side-toggle"
+              onClick={() => setSideOpen((v) => !v)}
+              aria-label="사이드 메뉴"
+            >
+              <HamburgerIcon />
+            </button>
+          )}
+
+          <Link
+            href={`/admin/${slug}/dashboard`}
+            className="topnav-brand"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-          </button>
-          <Link href={`/admin/${slug}/dashboard`} className={styles.brand}>
-            <span className={styles.brandLogo}>{siteName?.charAt(0) || 'R'}</span>
-            <span className={styles.brandText}>{siteName}</span>
+            <span className="user-avatar" style={{ width: 34, height: 34 }}>
+              {brandInitial}
+            </span>
+            <span className="topnav-brand-text">{siteName}</span>
           </Link>
-          <nav className={`${styles.topMenu} ${drawerOpen ? styles.topMenuOpen : ''}`}>
+
+          <div
+            className={`topnav-menu${mobileMenuOpen ? ' mobile-open' : ''}`}
+          >
             {allMenus.map((menu) => (
               <Link
                 key={menu.key}
                 href={`/admin/${slug}${menu.href}`}
-                className={`${styles.topMenuLink} ${
-                  activeTopKey === menu.key ? styles.topMenuActive : ''
+                className={`topnav-link${
+                  activeTopKey === menu.key ? ' active' : ''
                 }`}
-                onClick={() => setDrawerOpen(false)}
+                onClick={() => setMobileMenuOpen(false)}
               >
                 {menu.label}
               </Link>
             ))}
-          </nav>
-          <div className={styles.topActions}>
-            <button className={styles.profileBtn} aria-label="프로필">
+          </div>
+
+          <div className="topnav-actions">
+            <button type="button" className="btn btn-ghost btn-sm">
               프로필
+            </button>
+            <button
+              type="button"
+              className="topnav-side-toggle"
+              onClick={() => setMobileMenuOpen((v) => !v)}
+              aria-label="메뉴"
+            >
+              <HamburgerIcon />
             </button>
           </div>
         </div>
-      </header>
+      </nav>
 
-      {/* 메인 컨테이너 (서브 사이드바 + 콘텐츠) */}
-      <div className={styles.mainContainer}>
-        {subMenus.length > 1 && (
-          <aside className={styles.subSidebar}>
-            <div className={styles.subSidebarHeader}>{activeTop?.label}</div>
-            <nav className={styles.subNavList}>
+      {/* 메인 레이아웃 */}
+      {hasSubMenus ? (
+        <div className="wb-wrap">
+          <aside className={`wb-side${sideOpen ? ' open' : ''}`}>
+            <div
+              style={{
+                fontSize: 'var(--fs-xs)',
+                fontWeight: 'var(--fw-bold)',
+                color: 'var(--text-tertiary)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                padding: '0 12px 12px',
+                borderBottom: '1px solid var(--border)',
+                marginBottom: '12px',
+              }}
+            >
+              {activeTop?.label}
+            </div>
+            <div className="pd-side-group">
               {subMenus.map((sub) => (
                 <Link
                   key={sub.key}
                   href={`/admin/${slug}${sub.href}`}
-                  className={`${styles.subNavItem} ${
-                    isSubActive(sub.href) ? styles.subNavActive : ''
+                  className={`pd-side-group-label${
+                    isSubActive(sub.href) ? ' active' : ''
                   }`}
+                  onClick={() => setSideOpen(false)}
                 >
                   {sub.label}
                 </Link>
               ))}
-            </nav>
+            </div>
           </aside>
-        )}
-
-        <main className={styles.mainContent}>
-          <div className={styles.contentWrapper}>{children}</div>
+          <main className="wb-main" style={{ paddingTop: 24 }}>
+            {children}
+          </main>
+        </div>
+      ) : (
+        <main
+          className="wb-main"
+          style={{
+            paddingTop: 24,
+            minHeight: 'calc(100vh - var(--header-height, 60px))',
+          }}
+        >
+          {children}
         </main>
-      </div>
+      )}
 
-      {drawerOpen && (
+      {/* 모바일 오버레이 */}
+      {sideOpen && (
         <div
-          className={styles.drawerOverlay}
-          onClick={() => setDrawerOpen(false)}
+          className="wb-side-overlay show"
+          onClick={() => setSideOpen(false)}
         />
       )}
-    </div>
+      {mobileMenuOpen && (
+        <div
+          className="topnav-drawer-overlay show"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+    </>
   );
 }

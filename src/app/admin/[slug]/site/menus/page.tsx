@@ -2,43 +2,48 @@
 
 import { useState, useEffect, FormEvent } from 'react';
 
-interface Service {
+interface SiteMenuItem {
   id: number;
-  name: string;
-  description: string | null;
-  price: number | null;
-  category: string | null;
-  isActive: boolean;
+  menuType: string;
+  label: string;
+  url: string | null;
+  icon: string | null;
   sortOrder: number;
-  createdAt: string;
-  updatedAt: string;
+  isActive: boolean;
+  parentId: number | null;
 }
 
 type FormState = {
-  name: string;
-  description: string;
-  price: string;
-  category: string;
+  menuType: string;
+  label: string;
+  url: string;
+  sortOrder: string;
   isActive: boolean;
 };
 
 const EMPTY_FORM: FormState = {
-  name: '',
-  description: '',
-  price: '',
-  category: '',
+  menuType: 'menubar',
+  label: '',
+  url: '',
+  sortOrder: '0',
   isActive: true,
 };
 
-export default function ServicesPage({
+const MENU_TYPE_LABEL: Record<string, string> = {
+  menubar: '상단 메뉴',
+  bottom: '하단 메뉴',
+};
+
+export default function SiteMenusPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const [slug, setSlug] = useState<string | null>(null);
-  const [services, setServices] = useState<Service[]>([]);
+  const [items, setItems] = useState<SiteMenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeMenuType, setActiveMenuType] = useState<string>('menubar');
 
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -54,26 +59,24 @@ export default function ServicesPage({
 
   useEffect(() => {
     if (!slug) return;
-    fetchServices(slug);
+    fetchItems(slug);
   }, [slug]);
 
-  async function fetchServices(siteSlug: string) {
+  async function fetchItems(siteSlug: string) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/admin/services?slug=${siteSlug}`);
+      const response = await fetch(`/api/admin/menus?slug=${siteSlug}`);
       if (response.ok) {
         const data = await response.json();
-        setServices(data.services || []);
+        setItems(data.data || []);
       } else {
-        setError(`시술 목록을 불러올 수 없습니다 (${response.status})`);
-        setServices([]);
+        setError(`메뉴 목록 로딩 실패 (${response.status})`);
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      console.error('Failed to fetch services:', errorMsg);
-      setError(`시술 목록 로딩 실패: ${errorMsg}`);
-      setServices([]);
+      console.error('Failed to fetch menu items:', errorMsg);
+      setError(`메뉴 목록 로딩 실패: ${errorMsg}`);
     } finally {
       setLoading(false);
     }
@@ -81,19 +84,24 @@ export default function ServicesPage({
 
   function openCreateModal() {
     setEditingId(null);
-    setFormState(EMPTY_FORM);
+    const filtered = items.filter((i) => i.menuType === activeMenuType);
+    setFormState({
+      ...EMPTY_FORM,
+      menuType: activeMenuType,
+      sortOrder: String(filtered.length * 10),
+    });
     setFormError(null);
     setShowModal(true);
   }
 
-  function openEditModal(service: Service) {
-    setEditingId(service.id);
+  function openEditModal(item: SiteMenuItem) {
+    setEditingId(item.id);
     setFormState({
-      name: service.name,
-      description: service.description || '',
-      price: service.price !== null ? String(service.price) : '',
-      category: service.category || '',
-      isActive: service.isActive,
+      menuType: item.menuType,
+      label: item.label,
+      url: item.url || '',
+      sortOrder: String(item.sortOrder),
+      isActive: item.isActive,
     });
     setFormError(null);
     setShowModal(true);
@@ -109,8 +117,14 @@ export default function ServicesPage({
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!slug) return;
-    if (!formState.name.trim()) {
-      setFormError('시술명은 필수 입력입니다.');
+    if (!formState.label.trim()) {
+      setFormError('라벨은 필수 입력입니다.');
+      return;
+    }
+
+    const sortOrderValue = Number(formState.sortOrder);
+    if (Number.isNaN(sortOrderValue)) {
+      setFormError('정렬 순서는 숫자로 입력해주세요.');
       return;
     }
 
@@ -118,32 +132,25 @@ export default function ServicesPage({
     setFormError(null);
 
     try {
-      const priceValue =
-        formState.price.trim() === '' ? null : Number(formState.price);
-      if (priceValue !== null && Number.isNaN(priceValue)) {
-        setFormError('가격은 숫자로 입력해주세요.');
-        setSubmitting(false);
-        return;
-      }
-
-      const payload = {
+      const payload: Record<string, unknown> = {
         slug,
-        name: formState.name.trim(),
-        description: formState.description.trim() || null,
-        price: priceValue,
-        category: formState.category.trim() || null,
+        menuType: formState.menuType,
+        label: formState.label.trim(),
+        url: formState.url.trim() || null,
+        sortOrder: sortOrderValue,
         isActive: formState.isActive,
       };
 
       let response: Response;
       if (editingId !== null) {
-        response = await fetch(`/api/admin/services/${editingId}`, {
+        payload.id = editingId;
+        response = await fetch('/api/admin/menus', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
       } else {
-        response = await fetch('/api/admin/services', {
+        response = await fetch('/api/admin/menus', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -151,7 +158,7 @@ export default function ServicesPage({
       }
 
       if (response.ok) {
-        await fetchServices(slug);
+        await fetchItems(slug);
         closeModal();
       } else {
         const data = await response.json().catch(() => ({}));
@@ -159,57 +166,63 @@ export default function ServicesPage({
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      console.error('Failed to save service:', errorMsg);
+      console.error('Failed to save menu item:', errorMsg);
       setFormError(`저장 실패: ${errorMsg}`);
     } finally {
       setSubmitting(false);
     }
   }
 
-  async function handleDelete(service: Service) {
+  async function handleDelete(item: SiteMenuItem) {
     if (!slug) return;
-    const ok = confirm(`"${service.name}" 시술을 삭제하시겠습니까?`);
+    const ok = confirm(`"${item.label}" 메뉴를 삭제하시겠습니까?`);
     if (!ok) return;
 
     try {
-      const response = await fetch(
-        `/api/admin/services/${service.id}?slug=${slug}`,
-        { method: 'DELETE' }
-      );
+      const response = await fetch('/api/admin/menus', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, id: item.id }),
+      });
       if (response.ok) {
-        await fetchServices(slug);
+        await fetchItems(slug);
       } else {
         setError(`삭제 실패 (${response.status})`);
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      console.error('Failed to delete service:', errorMsg);
+      console.error('Failed to delete menu item:', errorMsg);
       setError(`삭제 실패: ${errorMsg}`);
     }
   }
 
-  async function toggleActive(service: Service) {
+  async function toggleActive(item: SiteMenuItem) {
     if (!slug) return;
     try {
-      const response = await fetch(`/api/admin/services/${service.id}`, {
+      const response = await fetch('/api/admin/menus', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slug,
-          isActive: !service.isActive,
+          id: item.id,
+          isActive: !item.isActive,
         }),
       });
       if (response.ok) {
-        await fetchServices(slug);
+        await fetchItems(slug);
       } else {
         setError(`상태 변경 실패 (${response.status})`);
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      console.error('Failed to toggle service:', errorMsg);
+      console.error('Failed to toggle menu:', errorMsg);
       setError(`상태 변경 실패: ${errorMsg}`);
     }
   }
+
+  const filteredItems = items.filter((i) => i.menuType === activeMenuType);
+  const menubarCount = items.filter((i) => i.menuType === 'menubar').length;
+  const bottomCount = items.filter((i) => i.menuType === 'bottom').length;
 
   if (!slug) {
     return (
@@ -222,7 +235,6 @@ export default function ServicesPage({
 
   return (
     <div>
-      {/* 페이지 헤더 */}
       <div
         style={{
           display: 'flex',
@@ -232,13 +244,17 @@ export default function ServicesPage({
         }}
       >
         <div>
-          <h1 className="c-page-title">시술 관리</h1>
+          <h1 className="c-page-title">메뉴 관리</h1>
           <p className="c-page-subtitle">
-            고객에게 노출되는 시술·상품 목록을 관리합니다.
+            사이트의 상단·하단 메뉴 항목을 관리합니다.
           </p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={openCreateModal}>
-          + 시술 추가
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={openCreateModal}
+        >
+          + 메뉴 추가
         </button>
       </div>
 
@@ -248,7 +264,32 @@ export default function ServicesPage({
         </div>
       )}
 
-      {/* 리스트 카드 */}
+      {/* 탭 */}
+      <div className="pd-filter">
+        <div className="pd-filter-tabs">
+          <button
+            type="button"
+            className={`pd-ftab${
+              activeMenuType === 'menubar' ? ' active' : ''
+            }`}
+            onClick={() => setActiveMenuType('menubar')}
+          >
+            상단 메뉴
+            <span className="pd-ftab-count">{menubarCount}</span>
+          </button>
+          <button
+            type="button"
+            className={`pd-ftab${
+              activeMenuType === 'bottom' ? ' active' : ''
+            }`}
+            onClick={() => setActiveMenuType('bottom')}
+          >
+            하단 메뉴
+            <span className="pd-ftab-count">{bottomCount}</span>
+          </button>
+        </div>
+      </div>
+
       <div
         className="card"
         style={{
@@ -261,12 +302,12 @@ export default function ServicesPage({
             <div className="spinner" style={{ margin: '0 auto 12px' }} />
             <div className="c-empty-text">로딩 중...</div>
           </div>
-        ) : services.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <div className="c-empty">
             <div className="c-empty-icon">📋</div>
             <div className="c-empty-text">
-              등록된 시술이 없습니다. &quot;+ 시술 추가&quot; 버튼을 눌러
-              추가해보세요.
+              {MENU_TYPE_LABEL[activeMenuType] || activeMenuType} 메뉴가
+              없습니다.
             </div>
           </div>
         ) : (
@@ -274,68 +315,39 @@ export default function ServicesPage({
             <table className="c-table">
               <thead>
                 <tr>
-                  <th>시술명</th>
-                  <th>분류</th>
-                  <th>가격</th>
-                  <th>설명</th>
+                  <th style={{ width: 80 }}>순서</th>
+                  <th>라벨</th>
+                  <th>URL</th>
                   <th>상태</th>
-                  <th style={{ width: 140, textAlign: 'right' }}>관리</th>
+                  <th style={{ width: 160, textAlign: 'right' }}>관리</th>
                 </tr>
               </thead>
               <tbody>
-                {services.map((service) => (
-                  <tr key={service.id}>
+                {filteredItems.map((item) => (
+                  <tr key={item.id}>
+                    <td style={{ color: 'var(--text-tertiary)' }}>
+                      {item.sortOrder}
+                    </td>
                     <td style={{ fontWeight: 'var(--fw-semi)' }}>
-                      {service.name}
+                      {item.label}
                     </td>
-                    <td>
-                      {service.category ? (
-                        <span className="c-badge c-badge-gray">
-                          {service.category}
-                        </span>
-                      ) : (
-                        <span style={{ color: 'var(--text-tertiary)' }}>-</span>
-                      )}
-                    </td>
-                    <td
-                      style={{
-                        color: 'var(--accent)',
-                        fontWeight: 'var(--fw-bold)',
-                      }}
-                    >
-                      {service.price !== null
-                        ? `${service.price.toLocaleString('ko-KR')}원`
-                        : '-'}
-                    </td>
-                    <td
-                      style={{
-                        maxWidth: 300,
-                        color: 'var(--text-secondary)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {service.description || (
-                        <span style={{ color: 'var(--text-tertiary)' }}>-</span>
-                      )}
+                    <td style={{ color: 'var(--text-secondary)' }}>
+                      {item.url || <span style={{ color: 'var(--text-tertiary)' }}>-</span>}
                     </td>
                     <td>
                       <button
                         type="button"
                         className={`c-badge ${
-                          service.isActive
-                            ? 'c-badge-success'
-                            : 'c-badge-error'
+                          item.isActive ? 'c-badge-success' : 'c-badge-error'
                         }`}
-                        onClick={() => toggleActive(service)}
+                        onClick={() => toggleActive(item)}
                         style={{
                           border: 'none',
                           cursor: 'pointer',
                           fontWeight: 'var(--fw-semi)',
                         }}
                       >
-                        {service.isActive ? '활성' : '비활성'}
+                        {item.isActive ? '활성' : '비활성'}
                       </button>
                     </td>
                     <td style={{ textAlign: 'right' }}>
@@ -349,14 +361,14 @@ export default function ServicesPage({
                         <button
                           type="button"
                           className="btn btn-secondary btn-sm"
-                          onClick={() => openEditModal(service)}
+                          onClick={() => openEditModal(item)}
                         >
                           수정
                         </button>
                         <button
                           type="button"
                           className="btn btn-danger btn-sm"
-                          onClick={() => handleDelete(service)}
+                          onClick={() => handleDelete(item)}
                         >
                           삭제
                         </button>
@@ -370,17 +382,13 @@ export default function ServicesPage({
         )}
       </div>
 
-      {/* 모달 (slide-panel 스타일) */}
       {showModal && (
         <div className="slide-panel open">
-          <div
-            className="slide-panel-overlay"
-            onClick={closeModal}
-          />
+          <div className="slide-panel-overlay" onClick={closeModal} />
           <div className="slide-panel-content">
             <div className="slide-panel-header">
               <div className="slide-panel-title">
-                {editingId !== null ? '시술 수정' : '시술 추가'}
+                {editingId !== null ? '메뉴 수정' : '메뉴 추가'}
               </div>
               <button
                 type="button"
@@ -414,73 +422,69 @@ export default function ServicesPage({
               )}
 
               <div className="form-group">
-                <label htmlFor="service-name" className="form-label">
-                  시술명 *
+                <label htmlFor="menu-type" className="form-label">
+                  메뉴 유형
+                </label>
+                <select
+                  id="menu-type"
+                  className="form-select"
+                  value={formState.menuType}
+                  onChange={(e) =>
+                    setFormState({ ...formState, menuType: e.target.value })
+                  }
+                >
+                  <option value="menubar">상단 메뉴</option>
+                  <option value="bottom">하단 메뉴</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="menu-label" className="form-label">
+                  라벨 *
                 </label>
                 <input
-                  id="service-name"
+                  id="menu-label"
                   type="text"
                   className="form-input"
-                  value={formState.name}
+                  value={formState.label}
                   onChange={(e) =>
-                    setFormState({ ...formState, name: e.target.value })
+                    setFormState({ ...formState, label: e.target.value })
                   }
-                  placeholder="예: 디자인 머리 시술"
+                  placeholder="예: 홈, 시술, 후기"
                   required
                   autoFocus
                 />
               </div>
 
               <div className="form-group">
-                <label htmlFor="service-category" className="form-label">
-                  분류
+                <label htmlFor="menu-url" className="form-label">
+                  URL
                 </label>
                 <input
-                  id="service-category"
+                  id="menu-url"
                   type="text"
                   className="form-input"
-                  value={formState.category}
+                  value={formState.url}
                   onChange={(e) =>
-                    setFormState({ ...formState, category: e.target.value })
+                    setFormState({ ...formState, url: e.target.value })
                   }
-                  placeholder="예: 커트, 파마, 염색"
+                  placeholder="예: /about, /services, https://..."
                 />
               </div>
 
               <div className="form-group">
-                <label htmlFor="service-price" className="form-label">
-                  가격 (원)
+                <label htmlFor="menu-sort" className="form-label">
+                  정렬 순서
                 </label>
                 <input
-                  id="service-price"
+                  id="menu-sort"
                   type="number"
-                  min="0"
-                  step="1000"
                   className="form-input"
-                  value={formState.price}
+                  value={formState.sortOrder}
                   onChange={(e) =>
-                    setFormState({ ...formState, price: e.target.value })
+                    setFormState({ ...formState, sortOrder: e.target.value })
                   }
-                  placeholder="예: 50000"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="service-description" className="form-label">
-                  설명
-                </label>
-                <textarea
-                  id="service-description"
-                  className="form-textarea"
-                  value={formState.description}
-                  onChange={(e) =>
-                    setFormState({
-                      ...formState,
-                      description: e.target.value,
-                    })
-                  }
-                  placeholder="시술 설명을 입력하세요..."
-                  rows={4}
+                  placeholder="0"
                 />
               </div>
 
@@ -507,7 +511,7 @@ export default function ServicesPage({
                     }
                     style={{ width: 'auto', margin: 0 }}
                   />
-                  활성 상태 (고객에게 노출)
+                  활성 상태 (사이트에 노출)
                 </label>
               </div>
 

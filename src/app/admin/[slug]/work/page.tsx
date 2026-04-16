@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import styles from './Work.module.css';
+import { useSearchParams } from 'next/navigation';
 
 interface MaintenanceRequest {
   id: number;
@@ -14,15 +14,49 @@ interface MaintenanceRequest {
   updatedAt: string;
 }
 
-export default function WorkPage({ params }: { params: Promise<{ slug: string }> }) {
+const STATUS_LABEL: Record<string, string> = {
+  pending: '대기',
+  reviewing: '검토',
+  working: '진행',
+  done: '완료',
+};
+
+const STATUS_BADGE: Record<string, string> = {
+  pending: 'c-badge-warning',
+  reviewing: 'c-badge-purple',
+  working: 'c-badge-info',
+  done: 'c-badge-success',
+};
+
+const PRIORITY_LABEL: Record<string, string> = {
+  low: '낮음',
+  normal: '보통',
+  high: '높음',
+  urgent: '긴급',
+};
+
+const PRIORITY_BADGE: Record<string, string> = {
+  low: 'c-badge-gray',
+  normal: 'c-badge-gray',
+  high: 'c-badge-warning',
+  urgent: 'c-badge-error',
+};
+
+export default function WorkPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const searchParams = useSearchParams();
   const [slug, setSlug] = useState<string | null>(null);
   const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState('all');
+
+  // URL 쿼리스트링 기반 필터 (사이드바 서브메뉴와 동기화)
+  const statusFilter = searchParams.get('status') || 'all';
 
   useEffect(() => {
-    // params를 resolve
     params.then(({ slug: paramSlug }) => {
       setSlug(paramSlug);
     });
@@ -41,13 +75,13 @@ export default function WorkPage({ params }: { params: Promise<{ slug: string }>
           const data = await response.json();
           setRequests(data.requests || []);
         } else {
-          setError(`Failed to load work items (${response.status})`);
+          setError(`작업 목록을 불러올 수 없습니다 (${response.status})`);
           setRequests([]);
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Unknown error';
         console.error('Failed to fetch requests:', errorMsg);
-        setError(`Failed to load work items: ${errorMsg}`);
+        setError(`작업 목록 로딩 실패: ${errorMsg}`);
         setRequests([]);
       } finally {
         setLoading(false);
@@ -62,94 +96,107 @@ export default function WorkPage({ params }: { params: Promise<{ slug: string }>
   );
 
   if (!slug) {
-    return <div>로딩 중...</div>;
+    return (
+      <div className="c-empty">
+        <div className="spinner" style={{ margin: '0 auto 12px' }} />
+        <div className="c-empty-text">로딩 중...</div>
+      </div>
+    );
   }
 
   return (
-    <div className={styles.work}>
-      <div className={styles.header}>
-        <h1>작업</h1>
-        <p className={styles.subtitle}>유지보수 요청과 채팅을 관리하세요.</p>
+    <div>
+      <div style={{ marginBottom: 20 }}>
+        <h1 className="c-page-title">작업</h1>
+        <p className="c-page-subtitle">
+          유지보수 요청과 채팅을 관리하세요.
+        </p>
       </div>
 
-      {/* 필터 */}
-      <div className={styles.filterBar}>
-        <div className={styles.filterGroup}>
-          <button
-            className={`${styles.filterBtn} ${statusFilter === 'all' ? styles.active : ''}`}
-            onClick={() => setStatusFilter('all')}
-          >
-            전체 ({requests.length})
-          </button>
-          <button
-            className={`${styles.filterBtn} ${statusFilter === 'pending' ? styles.active : ''}`}
-            onClick={() => setStatusFilter('pending')}
-          >
-            대기 ({requests.filter((r) => r.status === 'pending').length})
-          </button>
-          <button
-            className={`${styles.filterBtn} ${statusFilter === 'reviewing' ? styles.active : ''}`}
-            onClick={() => setStatusFilter('reviewing')}
-          >
-            검토 중 ({requests.filter((r) => r.status === 'reviewing').length})
-          </button>
-          <button
-            className={`${styles.filterBtn} ${statusFilter === 'working' ? styles.active : ''}`}
-            onClick={() => setStatusFilter('working')}
-          >
-            진행 중 ({requests.filter((r) => r.status === 'working').length})
-          </button>
-          <button
-            className={`${styles.filterBtn} ${statusFilter === 'done' ? styles.active : ''}`}
-            onClick={() => setStatusFilter('done')}
-          >
-            완료 ({requests.filter((r) => r.status === 'done').length})
-          </button>
+      {error && (
+        <div className="c-alert c-alert-error" style={{ marginBottom: 16 }}>
+          {error}
         </div>
-      </div>
+      )}
 
-      {/* 요청 목록 */}
-      <div className={styles.requestList}>
-        {error ? (
-          <div style={{ padding: '20px', color: '#cc222c', textAlign: 'center', background: '#ffebee', borderRadius: '8px' }}>
-            ⚠️ {error}
+      <div
+        className="card"
+        style={{
+          border: '1px solid var(--border)',
+          overflow: 'hidden',
+        }}
+      >
+        {loading ? (
+          <div className="c-empty">
+            <div className="spinner" style={{ margin: '0 auto 12px' }} />
+            <div className="c-empty-text">로딩 중...</div>
           </div>
-        ) : loading ? (
-          <div className={styles.loading}>로딩 중...</div>
         ) : filteredRequests.length === 0 ? (
-          <div className={styles.emptyState}>
-            <p>작업이 없습니다.</p>
+          <div className="c-empty">
+            <div className="c-empty-icon">✅</div>
+            <div className="c-empty-text">작업이 없습니다.</div>
           </div>
         ) : (
-          filteredRequests.map((request) => (
-            <Link
-              key={request.id}
-              href={`/admin/${slug}/work/${request.id}`}
-              className={styles.requestCard}
-            >
-              <div className={styles.requestHeader}>
-                <h3 className={styles.requestTitle}>{request.title}</h3>
-                <span className={`${styles.badge} ${styles[request.status]}`}>
-                  {request.status === 'pending' && '대기'}
-                  {request.status === 'reviewing' && '검토'}
-                  {request.status === 'working' && '진행'}
-                  {request.status === 'done' && '완료'}
-                </span>
-              </div>
-              <div className={styles.requestMeta}>
-                <span className={styles.category}>{request.category}</span>
-                <span className={`${styles.priority} ${styles[request.priority]}`}>
-                  {request.priority === 'low' && '낮음'}
-                  {request.priority === 'normal' && '보통'}
-                  {request.priority === 'high' && '높음'}
-                  {request.priority === 'urgent' && '긴급'}
-                </span>
-              </div>
-              <div className={styles.requestDate}>
-                {new Date(request.createdAt).toLocaleDateString('ko-KR')}
-              </div>
-            </Link>
-          ))
+          <div className="table-wrap">
+            <table className="c-table">
+              <thead>
+                <tr>
+                  <th>제목</th>
+                  <th>분류</th>
+                  <th>우선순위</th>
+                  <th>상태</th>
+                  <th>생성일</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRequests.map((request) => (
+                  <tr
+                    key={request.id}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => {
+                      window.location.href = `/admin/${slug}/work/${request.id}`;
+                    }}
+                  >
+                    <td style={{ fontWeight: 'var(--fw-semi)' }}>
+                      <Link
+                        href={`/admin/${slug}/work/${request.id}`}
+                        style={{
+                          color: 'var(--text-primary)',
+                          textDecoration: 'none',
+                        }}
+                      >
+                        {request.title}
+                      </Link>
+                    </td>
+                    <td style={{ color: 'var(--text-secondary)' }}>
+                      {request.category || '—'}
+                    </td>
+                    <td>
+                      <span
+                        className={`c-badge ${
+                          PRIORITY_BADGE[request.priority] || 'c-badge-gray'
+                        }`}
+                      >
+                        {PRIORITY_LABEL[request.priority] || request.priority}
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        className={`c-badge ${
+                          STATUS_BADGE[request.status] || 'c-badge-gray'
+                        }`}
+                      >
+                        {STATUS_LABEL[request.status] || request.status}
+                      </span>
+                    </td>
+                    <td style={{ color: 'var(--text-secondary)' }}>
+                      {new Date(request.createdAt).toLocaleDateString('ko-KR')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

@@ -5,6 +5,8 @@ import { sites } from '@/drizzle/schema';
 import { eq } from 'drizzle-orm';
 import { verifyAdminAccess } from '@/lib/admin-session';
 import AdminLayout from './AdminLayout';
+// 루딤링크 디자인 시스템 (공통 CSS 변수 + 컴포넌트 클래스)
+import '../_theme/roodim-link.css';
 
 interface AdminLayoutProps {
   children: ReactNode;
