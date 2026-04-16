@@ -41,3 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# local backups (일회성 마이그레이션 스크립트의 롤백 스냅샷)
+/backup
+
