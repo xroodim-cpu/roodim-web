@@ -62,6 +62,15 @@ export async function renderSiteFile(
 
   let html = content;
 
+  // 1-pre. 헤더/푸터 별칭 치환
+  //   <!--@header-->  → <!--@include("header.html")-->
+  //   <!--@footer-->  → <!--@include("footer.html")-->
+  // 페이지에 해당 치환코드가 있으면 스킨의 header.html/footer.html 내용이 삽입되고,
+  // 없으면 아무 것도 삽입되지 않아 페이지별로 헤더/푸터 노출 on/off 가 가능하다.
+  html = html
+    .replace(/<!--@header-->/g, '<!--@include("header.html")-->')
+    .replace(/<!--@footer-->/g, '<!--@include("footer.html")-->');
+
   // 1. include 처리 (최대 3 depth)
   html = await processIncludes(siteId, html, 0);
 
@@ -791,6 +800,10 @@ export function getAvailableVariables(): { code: string; description: string; ca
     { code: '{{OG_IMAGE}}', description: 'OG 이미지 URL (SNS 공유 이미지)', category: 'SEO' },
     { code: '{{FAVICON_URL}}', description: '파비콘 이미지 URL', category: 'SEO' },
     { code: '{{SNS_SHARE_IMAGE}}', description: 'SNS 공유 이미지 URL', category: 'SEO' },
+    // 레이아웃 (헤더/푸터)
+    { code: '<!--@header-->', description: '스킨의 header.html 내용 삽입 (없으면 미노출)', category: '레이아웃' },
+    { code: '<!--@footer-->', description: '스킨의 footer.html 내용 삽입 (없으면 미노출)', category: '레이아웃' },
+    { code: '<!--@include("파일명.html")-->', description: '임의의 스킨 파일 삽입 (최대 3단계 중첩)', category: '레이아웃' },
     // 배너 치환코드
     { code: '{#img_N}', description: '배너 N번 이미지 URL', category: '배너' },
     { code: '{#text_N}', description: '배너 N번 텍스트', category: '배너' },
