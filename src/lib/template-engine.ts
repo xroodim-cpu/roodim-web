@@ -1,6 +1,6 @@
 import { db } from './db';
-import { siteFiles, siteContents, siteConfigs, siteAdmins, sites, webSkinFiles, bannerAreas, bannerItems } from '@/drizzle/schema';
-import { eq, and, asc } from 'drizzle-orm';
+import { siteFiles, siteContents, siteConfigs, siteAdmins, sites, webSkinFiles, bannerAreas, bannerItems, boards, boardPosts } from '@/drizzle/schema';
+import { eq, and, asc, desc } from 'drizzle-orm';
 import { getFileContent } from './site';
 
 interface TemplateContext {
@@ -70,6 +70,9 @@ export async function renderSiteFile(
 
   // 3. 배너 영역 치환코드 처리
   html = await processBannerAreas(siteId, html);
+
+  // 3.5. 게시판 치환코드 처리
+  html = await processBoardCodes(siteId, slug, html);
 
   // 4. 치환코드 적용
   html = await applyVariables(ctx, html);
@@ -508,6 +511,195 @@ async function processBannerLoops(
 }
 
 /**
+ * 게시판 치환코드 처리
+ * - <!--@inquiry_form--> : 문의 폼 팝업 위젯 (인라인 HTML+JS)
+ * - <!--@qna_loop-->...<!--@end_qna_loop--> : Q&A 반복 출력
+ * - <!--@inquiry_list--> : 최근 문의 목록 (제목만)
+ */
+async function processBoardCodes(siteId: string, slug: string, html: string): Promise<string> {
+  // ── inquiry_form 위젯 ──
+  if (html.includes('<!--@inquiry_form-->')) {
+    // 문의 폼 필드 설정 로드 (없으면 기본 필드)
+    const configRows = await db.select()
+      .from(siteConfigs)
+      .where(and(eq(siteConfigs.siteId, siteId), eq(siteConfigs.section, 'inquiry_form')))
+      .limit(1);
+
+    const formConfig = (configRows[0]?.data || {}) as Record<string, unknown>;
+    const fields = (formConfig.fields as Array<{ name: string; type?: string; required?: boolean }>) || [
+      { name: '성함', type: 'text', required: true },
+      { name: '연락처', type: 'tel', required: true },
+      { name: '이메일', type: 'email', required: false },
+      { name: '문의내용', type: 'textarea', required: true },
+    ];
+
+    const fieldHtml = fields.map(f => {
+      const req = f.required ? ' required' : '';
+      if (f.type === 'textarea') {
+        return `<div class="roo-form-field"><label>${escapeHtmlTpl(f.name)}</label><textarea name="${escapeHtmlTpl(f.name)}" rows="4" placeholder="${escapeHtmlTpl(f.name)}을(를) 입력하세요"${req}></textarea></div>`;
+      }
+      return `<div class="roo-form-field"><label>${escapeHtmlTpl(f.name)}</label><input type="${f.type || 'text'}" name="${escapeHtmlTpl(f.name)}" placeholder="${escapeHtmlTpl(f.name)}을(를) 입력하세요"${req}></div>`;
+    }).join('\n          ');
+
+    const widget = `
+<!-- 문의 폼 위젯 (자동생성) -->
+<div class="roo-inquiry-widget">
+  <button type="button" class="roo-inquiry-trigger" onclick="document.getElementById('roo-inquiry-modal').style.display='flex'">문의하기</button>
+  <div id="roo-inquiry-modal" class="roo-inquiry-modal" style="display:none">
+    <div class="roo-inquiry-modal-content">
+      <div class="roo-inquiry-modal-header">
+        <h3>문의하기</h3>
+        <button type="button" onclick="document.getElementById('roo-inquiry-modal').style.display='none'">&times;</button>
+      </div>
+      <form id="roo-inquiry-form" class="roo-inquiry-form">
+        <div class="roo-inquiry-fields">
+          ${fieldHtml}
+        </div>
+        <div class="roo-inquiry-actions">
+          <button type="submit" class="roo-inquiry-submit">문의 접수</button>
+        </div>
+        <div id="roo-inquiry-msg" style="display:none;padding:8px;margin-top:8px;border-radius:4px;text-align:center"></div>
+      </form>
+    </div>
+  </div>
+</div>
+<style>
+.roo-inquiry-trigger{background:#cc222c;color:#fff;border:none;padding:12px 24px;border-radius:6px;font-size:15px;cursor:pointer;font-weight:600}
+.roo-inquiry-trigger:hover{opacity:.9}
+.roo-inquiry-modal{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center}
+.roo-inquiry-modal-content{background:#fff;border-radius:12px;width:min(480px,90vw);max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.roo-inquiry-modal-header{display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid #eee}
+.roo-inquiry-modal-header h3{margin:0;font-size:18px}
+.roo-inquiry-modal-header button{background:none;border:none;font-size:24px;cursor:pointer;color:#999}
+.roo-inquiry-form{padding:24px}
+.roo-inquiry-fields{display:flex;flex-direction:column;gap:16px}
+.roo-form-field label{display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:#333}
+.roo-form-field input,.roo-form-field textarea{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;box-sizing:border-box}
+.roo-form-field input:focus,.roo-form-field textarea:focus{outline:none;border-color:#cc222c}
+.roo-inquiry-actions{margin-top:20px;text-align:center}
+.roo-inquiry-submit{background:#cc222c;color:#fff;border:none;padding:12px 40px;border-radius:6px;font-size:15px;cursor:pointer;font-weight:600}
+.roo-inquiry-submit:hover{opacity:.9}
+.roo-inquiry-submit:disabled{opacity:.5;cursor:not-allowed}
+</style>
+<script>
+(function(){
+  var form=document.getElementById('roo-inquiry-form');
+  if(!form)return;
+  form.addEventListener('submit',function(e){
+    e.preventDefault();
+    var btn=form.querySelector('.roo-inquiry-submit');
+    var msg=document.getElementById('roo-inquiry-msg');
+    btn.disabled=true;btn.textContent='접수 중...';
+    var fields={};
+    form.querySelectorAll('input,textarea').forEach(function(el){
+      if(el.name)fields[el.name]=el.value;
+    });
+    fetch('/api/public/inquiry',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({slug:'${slug}',fields:fields})
+    }).then(function(r){return r.json()}).then(function(data){
+      if(data.ok){
+        msg.style.display='block';msg.style.background='#e8f5e9';msg.style.color='#2e7d32';
+        msg.textContent='문의가 접수되었습니다. 빠른 시일 내에 답변드리겠습니다.';
+        form.reset();
+        setTimeout(function(){document.getElementById('roo-inquiry-modal').style.display='none';msg.style.display='none'},2500);
+      }else{
+        msg.style.display='block';msg.style.background='#fce4ec';msg.style.color='#c62828';
+        msg.textContent=data.error||'접수 실패. 다시 시도해주세요.';
+      }
+    }).catch(function(){
+      msg.style.display='block';msg.style.background='#fce4ec';msg.style.color='#c62828';
+      msg.textContent='네트워크 오류. 다시 시도해주세요.';
+    }).finally(function(){btn.disabled=false;btn.textContent='문의 접수'});
+  });
+})();
+</script>
+<!-- /문의 폼 위젯 -->`;
+
+    html = html.replace('<!--@inquiry_form-->', widget);
+  }
+
+  // ── qna_loop ──
+  const qnaLoopRegex = /<!--@qna_loop-->([\s\S]*?)<!--@end_qna_loop-->/g;
+  const qnaMatch = qnaLoopRegex.exec(html);
+  if (qnaMatch) {
+    const [fullMatch, template] = qnaMatch;
+
+    // Q&A 게시판 찾기
+    const [qnaBoard] = await db.select()
+      .from(boards)
+      .where(and(eq(boards.siteId, siteId), eq(boards.systemKey, 'qna')))
+      .limit(1);
+
+    if (qnaBoard) {
+      const qnaPosts = await db.select()
+        .from(boardPosts)
+        .where(and(
+          eq(boardPosts.boardId, qnaBoard.id),
+          eq(boardPosts.isVisible, true),
+        ))
+        .orderBy(desc(boardPosts.isPinned), desc(boardPosts.createdAt))
+        .limit(50);
+
+      if (qnaPosts.length > 0) {
+        const rendered = qnaPosts.map((post, idx) => {
+          return template
+            .replace(/\{#qna_title\}/g, escapeHtmlTpl(post.title))
+            .replace(/\{#qna_content\}/g, post.content || '')
+            .replace(/\{#qna_num\}/g, String(idx + 1))
+            .replace(/\{#qna_author\}/g, escapeHtmlTpl(post.authorName || ''))
+            .replace(/\{#qna_date\}/g, new Date(post.createdAt).toLocaleDateString('ko-KR'));
+        }).join('\n');
+        html = html.replace(fullMatch, rendered);
+      } else {
+        html = html.replace(fullMatch, '<!-- no Q&A data -->');
+      }
+    } else {
+      html = html.replace(fullMatch, '<!-- no Q&A board -->');
+    }
+  }
+
+  // ── inquiry_list ──
+  if (html.includes('<!--@inquiry_list-->')) {
+    const [inquiryBoard] = await db.select()
+      .from(boards)
+      .where(and(eq(boards.siteId, siteId), eq(boards.systemKey, 'inquiry')))
+      .limit(1);
+
+    if (inquiryBoard) {
+      const recentPosts = await db.select()
+        .from(boardPosts)
+        .where(and(eq(boardPosts.boardId, inquiryBoard.id), eq(boardPosts.isVisible, true)))
+        .orderBy(desc(boardPosts.createdAt))
+        .limit(10);
+
+      if (recentPosts.length > 0) {
+        const listHtml = `<ul class="roo-inquiry-list">\n${recentPosts.map(p =>
+          `  <li><span class="roo-inquiry-list-title">${escapeHtmlTpl(p.title)}</span><span class="roo-inquiry-list-date">${new Date(p.createdAt).toLocaleDateString('ko-KR')}</span></li>`
+        ).join('\n')}\n</ul>`;
+        html = html.replace('<!--@inquiry_list-->', listHtml);
+      } else {
+        html = html.replace('<!--@inquiry_list-->', '<!-- no inquiries -->');
+      }
+    } else {
+      html = html.replace('<!--@inquiry_list-->', '<!-- no inquiry board -->');
+    }
+  }
+
+  return html;
+}
+
+/** 템플릿용 HTML 이스케이프 */
+function escapeHtmlTpl(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
  * 치환코드 목록 반환 (에디터에서 사용)
  */
 export function getAvailableVariables(): { code: string; description: string; category: string }[] {
@@ -565,5 +757,15 @@ export function getAvailableVariables(): { code: string; description: string; ca
     { code: '{#link}', description: '현재 배너 링크 (루프 내)', category: '배너루프' },
     { code: '{#title}', description: '현재 배너 제목 (루프 내)', category: '배너루프' },
     { code: '{#num}', description: '현재 배너 번호 (루프 내)', category: '배너루프' },
+    // 게시판 치환코드
+    { code: '<!--@inquiry_form-->', description: '문의 폼 팝업 위젯', category: '게시판' },
+    { code: '<!--@inquiry_list-->', description: '최근 문의 목록', category: '게시판' },
+    { code: '<!--@qna_loop-->', description: 'Q&A 루프 시작', category: '게시판' },
+    { code: '<!--@end_qna_loop-->', description: 'Q&A 루프 끝', category: '게시판' },
+    { code: '{#qna_title}', description: 'Q&A 제목 (루프 내)', category: '게시판' },
+    { code: '{#qna_content}', description: 'Q&A 내용 (루프 내)', category: '게시판' },
+    { code: '{#qna_num}', description: 'Q&A 번호 (루프 내)', category: '게시판' },
+    { code: '{#qna_author}', description: 'Q&A 작성자 (루프 내)', category: '게시판' },
+    { code: '{#qna_date}', description: 'Q&A 작성일 (루프 내)', category: '게시판' },
   ];
 }
