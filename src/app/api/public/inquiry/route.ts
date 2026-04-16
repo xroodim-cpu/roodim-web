@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { after } from 'next/server';
 import { db } from '@/lib/db';
 import { sites, boards, boardPosts } from '@/drizzle/schema';
 import { eq, and } from 'drizzle-orm';
@@ -75,9 +76,21 @@ export async function POST(req: NextRequest) {
       formData: fields,
     }).returning();
 
-    // 루딤링크(Laravel 어드민) 에도 미러링 — 실패해도 사용자 응답에는 영향 없음 (fire-and-forget).
-    adminApi('POST', `/api/sites/${encodeURIComponent(slug)}/bulletins/inquiry/submit`, { fields })
-      .catch((err) => console.warn('[inquiry mirror → laravel]', err));
+    // 루딤링크(Laravel 어드민) 에도 미러링 — 응답 후 background 실행.
+    //
+    // [NOTE] Next.js 16 의 `after()` 를 사용. Vercel 서버리스 함수는 응답 반환 시
+    // 일반 Promise 를 종료시키므로 fire-and-forget (단순 .catch) 패턴은
+    // 미러링 요청을 중도 취소한다. `after()` 는 Vercel 이 응답 후에도 실행을 보장.
+    after(async () => {
+      const result = await adminApi(
+        'POST',
+        `/api/sites/${encodeURIComponent(slug)}/bulletins/inquiry/submit`,
+        { fields }
+      );
+      if (!result.ok) {
+        console.warn('[inquiry mirror → laravel] failed:', result.error, 'slug=', slug);
+      }
+    });
 
     return NextResponse.json({
       ok: true,
