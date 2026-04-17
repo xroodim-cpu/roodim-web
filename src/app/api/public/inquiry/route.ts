@@ -148,8 +148,10 @@ function extractField(entries: [string, string][], keywords: string[]): string |
  */
 function extractFromText(text: string, keywords: string[]): string | null {
   for (const kw of keywords) {
+    // 라벨 뒤에 `(직책)` 같은 부가표기가 와도 매칭되도록 `[^:\n\r]*` 허용
+    //   ex) "성함(직책): 박선호 대표" → value = "박선호 대표"
     const re = new RegExp(
-      `(?:^|[\\n\\r])\\s*${kw.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s*[:：]\\s*([^\\n\\r]+)`,
+      `(?:^|[\\n\\r])\\s*${kw.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}[^:\\n\\r]*[:：]\\s*([^\\n\\r]+)`,
       'i',
     );
     const m = text.match(re);
