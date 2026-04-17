@@ -6,6 +6,21 @@ import dynamic from 'next/dynamic';
 const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), { ssr: false });
 
 /* ── 타입 ── */
+interface WbMember {
+  id: number;
+  siteId: string;
+  role: string;
+  customerName: string | null;
+  adminCustomerId: number | null;
+  invitedAt: string;
+}
+interface AvailableSite {
+  id: string;
+  name: string;
+  slug: string;
+  adminCustomerId: number | null;
+}
+
 interface Board {
   id: number;
   name: string;
@@ -71,12 +86,22 @@ export default function BoardsPage({
   // 사이드바 모바일
   const [sideOpen, setSideOpen] = useState(false);
 
+  // 멤버 관리
+  const [wbMembers, setWbMembers] = useState<WbMember[]>([]);
+  const [availableSites, setAvailableSites] = useState<AvailableSite[]>([]);
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteSiteId, setInviteSiteId] = useState('');
+  const [inviteRole, setInviteRole] = useState('viewer');
+
   useEffect(() => {
     params.then(({ slug: s }) => setSlug(s));
   }, [params]);
 
   useEffect(() => {
-    if (slug) loadBoards();
+    if (slug) {
+      loadBoards();
+      loadMembers();
+    }
   }, [slug]);
 
   useEffect(() => {
@@ -123,6 +148,64 @@ export default function BoardsPage({
       // ignore
     } finally {
       setPostsLoading(false);
+    }
+  }
+
+  /* ── 멤버 관리 ── */
+
+  async function loadMembers() {
+    if (!slug) return;
+    try {
+      const res = await fetch(`/api/admin/boards/members?slug=${slug}`);
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setWbMembers(data.members || []);
+        setAvailableSites(data.availableSites || []);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async function inviteMember(e: FormEvent) {
+    e.preventDefault();
+    if (!slug || !inviteSiteId) return;
+    const site = availableSites.find(s => s.id === inviteSiteId);
+    try {
+      const res = await fetch('/api/admin/boards/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug,
+          siteId: inviteSiteId,
+          role: inviteRole,
+          customerName: site?.name || null,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setShowInvite(false);
+        setInviteSiteId('');
+        setInviteRole('viewer');
+        loadMembers();
+      } else {
+        alert(data.error || '초대 실패');
+      }
+    } catch {
+      alert('초대 실패');
+    }
+  }
+
+  async function removeMember(memberId: number, name: string) {
+    if (!slug) return;
+    if (!confirm(`${name || '멤버'}를 제거하시겠습니까?`)) return;
+    try {
+      await fetch(`/api/admin/boards/members?slug=${slug}&memberId=${memberId}`, {
+        method: 'DELETE',
+      });
+      loadMembers();
+    } catch {
+      alert('제거 실패');
     }
   }
 
@@ -389,6 +472,88 @@ export default function BoardsPage({
                 + 게시판 추가
               </button>
             )}
+          </div>
+
+          {/* 멤버 관리 */}
+          <div className="bd-side-members">
+            <div className="bd-side-heading" style={{ marginTop: 8 }}>
+              멤버
+              <span style={{ fontSize: 12, color: 'var(--text-tertiary)', marginLeft: 6 }}>{wbMembers.length}</span>
+            </div>
+            <div className="pd-side-group">
+              {wbMembers.length === 0 ? (
+                <div style={{ padding: '8px 12px', fontSize: 13, color: 'var(--text-tertiary)' }}>
+                  초대된 멤버가 없습니다.
+                </div>
+              ) : (
+                wbMembers.map((m) => (
+                  <div key={m.id} className="bd-side-row" style={{ alignItems: 'center' }}>
+                    <span className="bd-side-name" style={{ flex: 1, fontSize: 13 }}>
+                      {m.customerName || '(이름 없음)'}
+                    </span>
+                    <span style={{
+                      fontSize: 11, padding: '1px 6px', borderRadius: 4,
+                      background: m.role === 'editor' ? '#e8f5e9' : '#e3f2fd',
+                      color: m.role === 'editor' ? '#2e7d32' : '#1565c0',
+                    }}>
+                      {m.role === 'editor' ? '편집' : '열람'}
+                    </span>
+                    <button
+                      type="button"
+                      className="bd-side-delete"
+                      onClick={() => removeMember(m.id, m.customerName || '')}
+                      title="멤버 제거"
+                      aria-label="멤버 제거"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* 멤버 초대 */}
+            <div className="bd-side-add">
+              {showInvite ? (
+                <form onSubmit={inviteMember} className="bd-side-add-form">
+                  <select
+                    className="form-input"
+                    value={inviteSiteId}
+                    onChange={(e) => setInviteSiteId(e.target.value)}
+                    required
+                    style={{ fontSize: 13 }}
+                  >
+                    <option value="">사이트 선택</option>
+                    {availableSites.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.slug})
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="form-input"
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value)}
+                    style={{ fontSize: 13 }}
+                  >
+                    <option value="viewer">열람자</option>
+                    <option value="editor">편집자</option>
+                  </select>
+                  <div className="bd-side-add-actions">
+                    <button type="submit" className="btn btn-primary btn-sm">초대</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowInvite(false)}>취소</button>
+                  </div>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm bd-side-add-btn"
+                  onClick={() => setShowInvite(true)}
+                >
+                  + 멤버 초대
+                </button>
+              )}
+            </div>
           </div>
         </aside>
 
