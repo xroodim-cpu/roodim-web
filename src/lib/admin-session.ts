@@ -6,9 +6,10 @@ interface AdminSession {
   slug: string;
   member_id?: number;
   credential_id?: number;
+  customer_id?: number;
   name: string;
   role: string;
-  auth_type: 'sso' | 'credential';
+  auth_type: 'sso' | 'credential' | 'customer';
   exp: number;
 }
 

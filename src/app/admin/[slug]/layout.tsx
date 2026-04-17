@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
-import { sites } from '@/drizzle/schema';
+import { sites, workboardMembers } from '@/drizzle/schema';
 import { eq } from 'drizzle-orm';
 import { verifyAdminAccess } from '@/lib/admin-session';
 import AdminLayout from './AdminLayout';
@@ -33,8 +33,12 @@ export default async function RootLayout({ children, params }: AdminLayoutProps)
     redirect(`/admin/login/${slug}`);
   }
 
-  // 워크보드 존재 여부 확인 (나중에 구현)
-  const hasWorkboard = false; // TODO: workboard 조회 로직 추가
+  // 워크보드 멤버십 확인 (이 사이트가 어떤 워크보드에 속해있는지)
+  const membership = await db.select({ id: workboardMembers.id })
+    .from(workboardMembers)
+    .where(eq(workboardMembers.siteId, site.id))
+    .limit(1);
+  const hasWorkboard = membership.length > 0;
 
   return (
     <AdminLayout slug={slug} siteName={site.name} hasWorkboard={hasWorkboard}>

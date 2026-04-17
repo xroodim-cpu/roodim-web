@@ -32,16 +32,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '사이트를 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    // 사이트 관리자 세션 생성/갱신
-    await upsertSiteAdmin(site[0].id, payload.member_id, payload.member_name, payload.role);
+    // 고객 SSO vs 멤버 SSO 분기
+    const isCustomer = payload.auth_type === 'customer';
+
+    if (!isCustomer) {
+      // 멤버 SSO: 사이트 관리자 세션 생성/갱신
+      await upsertSiteAdmin(site[0].id, payload.member_id!, payload.member_name!, payload.role);
+    }
 
     // 세션 토큰 생성 (간단한 서명 기반)
     const sessionData = JSON.stringify({
       site_id: site[0].id,
       slug: payload.site_slug,
-      member_id: payload.member_id,
-      name: payload.member_name,
+      member_id: isCustomer ? undefined : payload.member_id,
+      customer_id: isCustomer ? payload.customer_id : undefined,
+      name: isCustomer ? payload.customer_name : payload.member_name,
       role: payload.role,
+      auth_type: payload.auth_type || 'sso',
       exp: Math.floor(Date.now() / 1000) + 86400, // 24시간
     });
 

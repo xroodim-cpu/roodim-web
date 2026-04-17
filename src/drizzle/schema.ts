@@ -349,6 +349,7 @@ export const workboards = pgTable('workboards', {
   slug: varchar('slug', { length: 100 }).unique().notNull(),
   ownerId: integer('owner_id'),  // Laravel members.id
   organizationId: integer('organization_id'),  // Laravel organizations.id
+  ownerSiteId: uuid('owner_site_id').references(() => sites.id),  // 공유할 게시판의 사이트
   visibility: varchar('visibility', { length: 20 }).default('private').notNull(),  // private, shared
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -359,6 +360,9 @@ export const workboardMembers = pgTable('workboard_members', {
   id: serial('id').primaryKey(),
   workboardId: integer('workboard_id').notNull().references(() => workboards.id, { onDelete: 'cascade' }),
   siteId: uuid('site_id').notNull().references(() => sites.id, { onDelete: 'cascade' }),
+  role: varchar('role', { length: 20 }).default('viewer').notNull(),  // viewer | editor
+  customerName: varchar('customer_name', { length: 100 }),
+  adminCustomerId: integer('admin_customer_id'),  // Laravel customers.id 역참조
   invitedAt: timestamp('invited_at').defaultNow().notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => [

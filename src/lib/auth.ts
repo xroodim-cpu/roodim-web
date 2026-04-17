@@ -7,8 +7,11 @@ const SSO_SECRET = process.env.SSO_SECRET!;
 
 interface SsoPayload {
   jti: string;
-  member_id: number;
-  member_name: string;
+  member_id?: number;
+  member_name?: string;
+  customer_id?: number;       // 고객 SSO 일 때
+  customer_name?: string;     // 고객 SSO 일 때
+  auth_type?: 'sso' | 'customer';
   site_slug: string;
   role: string;
   issued_at: number;
