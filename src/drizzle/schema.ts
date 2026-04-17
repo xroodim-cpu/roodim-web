@@ -359,14 +359,15 @@ export const workboards = pgTable('workboards', {
 export const workboardMembers = pgTable('workboard_members', {
   id: serial('id').primaryKey(),
   workboardId: integer('workboard_id').notNull().references(() => workboards.id, { onDelete: 'cascade' }),
-  siteId: uuid('site_id').notNull().references(() => sites.id, { onDelete: 'cascade' }),
+  siteId: uuid('site_id').references(() => sites.id, { onDelete: 'cascade' }),  // nullable — 사이트 없는 고객도 초대 가능
   role: varchar('role', { length: 20 }).default('viewer').notNull(),  // viewer | editor
   customerName: varchar('customer_name', { length: 100 }),
   adminCustomerId: integer('admin_customer_id'),  // Laravel customers.id 역참조
+  inviteToken: varchar('invite_token', { length: 64 }),  // 고객 포털 접근 토큰
   invitedAt: timestamp('invited_at').defaultNow().notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => [
-  uniqueIndex('workboard_members_wb_site_idx').on(table.workboardId, table.siteId),
+  uniqueIndex('workboard_members_wb_cust_idx').on(table.workboardId, table.adminCustomerId),
 ]);
 
 // ===== board_type enum =====
