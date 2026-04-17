@@ -678,6 +678,14 @@ function rooInquiryScript(slug: string): string {
  * - <!--@inquiry_list--> : 최근 문의 목록 (title 만, 레거시)
  */
 async function processBoardCodes(siteId: string, slug: string, html: string): Promise<string> {
+  // 사이트 타입 + 어드민 조직 ID 조회 (partner 사이트 → 루딤링크 게시판 사용)
+  const [siteRow] = await db.select({
+    siteType: sites.siteType,
+    adminOrganizationId: sites.adminOrganizationId,
+  }).from(sites).where(eq(sites.id, siteId)).limit(1);
+  const isPartner = siteRow?.siteType === 'partner' && !!siteRow.adminOrganizationId;
+  const orgId = siteRow?.adminOrganizationId ?? null;
+
   // ── inquiry_form 위젯 ──
   if (html.includes('<!--@inquiry_form-->')) {
     // 문의 폼 필드 설정 로드 (없으면 기본 필드)
@@ -764,16 +772,20 @@ ${rooInquiryScript(slug)}
   }
 
   // ── faq_loop (루딤링크 Laravel 어드민 FAQ 게시판에서 로드) ──
-  // @qna_loop 와 별개로 Laravel 어드민의 질문답변(FAQ) 게시판을 표시.
-  // 마커 예: <!--@faq_loop-->...<!--@end_faq_loop-->
-  //   템플릿 변수: {#faq_title} = 질문, {#faq_content} = 답변 HTML, {#faq_num} = 순번
+  // 마커: <!--@faq_loop-->...<!--@end_faq_loop-->
+  // 템플릿 변수: {#faq_title}, {#faq_content}, {#faq_num}, {#faq_date}
+  // partner 사이트 → Bridge API (/api/bridge/bulletins/faq/posts?org_id=X)
+  // 기타 사이트 → 기존 경로 (하위호환)
   const faqLoopRegex = /<!--@faq_loop-->([\s\S]*?)<!--@end_faq_loop-->/g;
   const faqMatch = faqLoopRegex.exec(html);
   if (faqMatch) {
     const [fullMatch, template] = faqMatch;
     try {
+      const faqApiPath = isPartner && orgId
+        ? `/api/bridge/bulletins/faq/posts?org_id=${orgId}&limit=50`
+        : `/api/sites/${encodeURIComponent(slug)}/bulletins/faq/posts?limit=50`;
       const result = await adminApi<{ ok: boolean; posts?: Array<{ id: number; title: string; content: string; author: string | null; created_label: string }> }>(
-        'GET', `/api/sites/${encodeURIComponent(slug)}/bulletins/faq/posts?limit=50`
+        'GET', faqApiPath
       );
       const posts = result.ok && result.data?.posts ? result.data.posts : [];
       if (posts.length > 0) {
@@ -793,42 +805,68 @@ ${rooInquiryScript(slug)}
   }
 
   // ── qna_loop ──
+  // partner 사이트 → Laravel Bridge API (faq 게시판)
+  // 그 외 → roodim-web DB (boardPosts)
   const qnaLoopRegex = /<!--@qna_loop-->([\s\S]*?)<!--@end_qna_loop-->/g;
   const qnaMatch = qnaLoopRegex.exec(html);
   if (qnaMatch) {
     const [fullMatch, template] = qnaMatch;
 
-    // Q&A 게시판 찾기
-    const [qnaBoard] = await db.select()
-      .from(boards)
-      .where(and(eq(boards.siteId, siteId), eq(boards.systemKey, 'qna')))
-      .limit(1);
-
-    if (qnaBoard) {
-      const qnaPosts = await db.select()
-        .from(boardPosts)
-        .where(and(
-          eq(boardPosts.boardId, qnaBoard.id),
-          eq(boardPosts.isVisible, true),
-        ))
-        .orderBy(desc(boardPosts.isPinned), desc(boardPosts.createdAt))
-        .limit(50);
-
-      if (qnaPosts.length > 0) {
-        const rendered = qnaPosts.map((post, idx) => {
-          return template
-            .replace(/\{#qna_title\}/g, escapeHtmlTpl(post.title))
+    if (isPartner && orgId) {
+      // ── partner: Laravel Bridge API 에서 FAQ 데이터 조회 ──
+      try {
+        const result = await adminApi<{ ok: boolean; posts?: Array<{ id: number; title: string; content: string; author: string | null; created_label: string }> }>(
+          'GET', `/api/bridge/bulletins/faq/posts?org_id=${orgId}&limit=50`
+        );
+        const posts = result.ok && result.data?.posts ? result.data.posts : [];
+        if (posts.length > 0) {
+          const rendered = posts.map((post, idx) => template
+            .replace(/\{#qna_title\}/g, escapeHtmlTpl(post.title || ''))
             .replace(/\{#qna_content\}/g, post.content || '')
             .replace(/\{#qna_num\}/g, String(idx + 1))
-            .replace(/\{#qna_author\}/g, escapeHtmlTpl(post.authorName || ''))
-            .replace(/\{#qna_date\}/g, new Date(post.createdAt).toLocaleDateString('ko-KR'));
-        }).join('\n');
-        html = html.replace(fullMatch, rendered);
-      } else {
-        html = html.replace(fullMatch, '<!-- no Q&A data -->');
+            .replace(/\{#qna_author\}/g, escapeHtmlTpl(post.author || ''))
+            .replace(/\{#qna_date\}/g, post.created_label || '')
+          ).join('\n');
+          html = html.replace(fullMatch, rendered);
+        } else {
+          html = html.replace(fullMatch, '<!-- no Q&A data (partner) -->');
+        }
+      } catch {
+        html = html.replace(fullMatch, '<!-- Q&A load failed (partner) -->');
       }
     } else {
-      html = html.replace(fullMatch, '<!-- no Q&A board -->');
+      // ── 기존: roodim-web DB 에서 조회 ──
+      const [qnaBoard] = await db.select()
+        .from(boards)
+        .where(and(eq(boards.siteId, siteId), eq(boards.systemKey, 'qna')))
+        .limit(1);
+
+      if (qnaBoard) {
+        const qnaPosts = await db.select()
+          .from(boardPosts)
+          .where(and(
+            eq(boardPosts.boardId, qnaBoard.id),
+            eq(boardPosts.isVisible, true),
+          ))
+          .orderBy(desc(boardPosts.isPinned), desc(boardPosts.createdAt))
+          .limit(50);
+
+        if (qnaPosts.length > 0) {
+          const rendered = qnaPosts.map((post, idx) => {
+            return template
+              .replace(/\{#qna_title\}/g, escapeHtmlTpl(post.title))
+              .replace(/\{#qna_content\}/g, post.content || '')
+              .replace(/\{#qna_num\}/g, String(idx + 1))
+              .replace(/\{#qna_author\}/g, escapeHtmlTpl(post.authorName || ''))
+              .replace(/\{#qna_date\}/g, new Date(post.createdAt).toLocaleDateString('ko-KR'));
+          }).join('\n');
+          html = html.replace(fullMatch, rendered);
+        } else {
+          html = html.replace(fullMatch, '<!-- no Q&A data -->');
+        }
+      } else {
+        html = html.replace(fullMatch, '<!-- no Q&A board -->');
+      }
     }
   }
 
@@ -862,11 +900,13 @@ ${rooInquiryScript(slug)}
 
     if (matches.length > 0) {
       // Laravel 어드민 FAQ 조회 (fail-open — 실패 시 원본 유지)
+      const faqAutoPath = isPartner && orgId
+        ? `/api/bridge/bulletins/faq/posts?org_id=${orgId}&limit=50`
+        : `/api/sites/${encodeURIComponent(slug)}/bulletins/faq/posts?limit=50`;
       let posts: Array<{ id: number; title: string; content: string; author: string | null; created_label: string }> = [];
       try {
         const result = await adminApi<{ ok: boolean; posts?: typeof posts }>(
-          'GET',
-          `/api/sites/${encodeURIComponent(slug)}/bulletins/faq/posts?limit=50`
+          'GET', faqAutoPath
         );
         if (result.ok && result.data?.posts) {
           posts = result.data.posts;
