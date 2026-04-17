@@ -839,15 +839,46 @@ ${rooInquiryScript(slug)}
   }
 
   // ── qna_loop ──
-  // partner 사이트 → Laravel Bridge API (faq 게시판)
-  // 그 외 → roodim-web DB (boardPosts)
+  // 항상 roodim-web DB(boards.systemKey='qna')를 먼저 조회.
+  // 로컬 데이터 없고 partner 사이트일 때만 Bridge API 폴백.
   const qnaLoopRegex = /<!--@qna_loop-->([\s\S]*?)<!--@end_qna_loop-->/g;
   const qnaMatch = qnaLoopRegex.exec(html);
   if (qnaMatch) {
     const [fullMatch, template] = qnaMatch;
+    let qnaResolved = false;
 
-    if (isPartner && orgId) {
-      // ── partner: Laravel Bridge API 에서 FAQ 데이터 조회 ──
+    // 1) 로컬 DB 조회 (partner 포함 모든 사이트)
+    const [qnaBoard] = await db.select()
+      .from(boards)
+      .where(and(eq(boards.siteId, siteId), eq(boards.systemKey, 'qna')))
+      .limit(1);
+
+    if (qnaBoard) {
+      const qnaPosts = await db.select()
+        .from(boardPosts)
+        .where(and(
+          eq(boardPosts.boardId, qnaBoard.id),
+          eq(boardPosts.isVisible, true),
+        ))
+        .orderBy(desc(boardPosts.isPinned), desc(boardPosts.createdAt))
+        .limit(50);
+
+      if (qnaPosts.length > 0) {
+        const rendered = qnaPosts.map((post, idx) => {
+          return template
+            .replace(/\{#qna_title\}/g, escapeHtmlTpl(post.title))
+            .replace(/\{#qna_content\}/g, post.content || '')
+            .replace(/\{#qna_num\}/g, String(idx + 1))
+            .replace(/\{#qna_author\}/g, escapeHtmlTpl(post.authorName || ''))
+            .replace(/\{#qna_date\}/g, new Date(post.createdAt).toLocaleDateString('ko-KR'));
+        }).join('\n');
+        html = html.replace(fullMatch, rendered);
+        qnaResolved = true;
+      }
+    }
+
+    // 2) 로컬 데이터 없으면 partner Bridge API 폴백
+    if (!qnaResolved && isPartner && orgId) {
       try {
         const result = await adminApi<{ ok: boolean; posts?: Array<{ id: number; title: string; content: string; author: string | null; created_label: string }> }>(
           'GET', `/api/bridge/bulletins/faq/posts?org_id=${orgId}&limit=50`
@@ -862,45 +893,13 @@ ${rooInquiryScript(slug)}
             .replace(/\{#qna_date\}/g, post.created_label || '')
           ).join('\n');
           html = html.replace(fullMatch, rendered);
-        } else {
-          html = html.replace(fullMatch, '<!-- no Q&A data (partner) -->');
+          qnaResolved = true;
         }
-      } catch {
-        html = html.replace(fullMatch, '<!-- Q&A load failed (partner) -->');
-      }
-    } else {
-      // ── 기존: roodim-web DB 에서 조회 ──
-      const [qnaBoard] = await db.select()
-        .from(boards)
-        .where(and(eq(boards.siteId, siteId), eq(boards.systemKey, 'qna')))
-        .limit(1);
+      } catch { /* bridge fallback failed — continue to empty */ }
+    }
 
-      if (qnaBoard) {
-        const qnaPosts = await db.select()
-          .from(boardPosts)
-          .where(and(
-            eq(boardPosts.boardId, qnaBoard.id),
-            eq(boardPosts.isVisible, true),
-          ))
-          .orderBy(desc(boardPosts.isPinned), desc(boardPosts.createdAt))
-          .limit(50);
-
-        if (qnaPosts.length > 0) {
-          const rendered = qnaPosts.map((post, idx) => {
-            return template
-              .replace(/\{#qna_title\}/g, escapeHtmlTpl(post.title))
-              .replace(/\{#qna_content\}/g, post.content || '')
-              .replace(/\{#qna_num\}/g, String(idx + 1))
-              .replace(/\{#qna_author\}/g, escapeHtmlTpl(post.authorName || ''))
-              .replace(/\{#qna_date\}/g, new Date(post.createdAt).toLocaleDateString('ko-KR'));
-          }).join('\n');
-          html = html.replace(fullMatch, rendered);
-        } else {
-          html = html.replace(fullMatch, '<!-- no Q&A data -->');
-        }
-      } else {
-        html = html.replace(fullMatch, '<!-- no Q&A board -->');
-      }
+    if (!qnaResolved) {
+      html = html.replace(fullMatch, '<!-- no Q&A data -->');
     }
   }
 
