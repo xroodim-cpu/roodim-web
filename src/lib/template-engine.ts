@@ -464,33 +464,44 @@ async function processBannerAreas(siteId: string, html: string): Promise<string>
         result = result.replace(/\{#areaDesc\}/g, area[0]?.areaDesc || '');
         result = result.replace(/\{#areaDisplayType\}/g, area[0]?.displayType || 'slide');
 
-        // 개별 배너 번호 기반 치환코드: {#img_1}, {#text_1}, {#link_1}, {#video_1}, {#target_1}
+        // ── 번호 기반 치환코드: {#img_1}, {#text_1} 등 ──
+        // 중요: banner_loop 안에서 {#text_N} 은 "현재 배너의 texts 배열 N번째"를 의미하므로
+        //       루프 블록을 먼저 보호하고, 루프 밖에서만 "num=N 배너 아이템" 매칭을 적용한다.
+        const loopBlocks: string[] = [];
+        let outsideLoops = result.replace(
+          /<!--@banner_loop-->([\s\S]*?)<!--@end_banner_loop-->/g,
+          (match) => { loopBlocks.push(match); return `__BLOOP_${loopBlocks.length - 1}__`; }
+        );
+
         for (const item of items) {
           const n = item.num;
-          result = result.replace(new RegExp(`\\{#img_${n}\\}`, 'g'), item.imgUrl || '');
-          result = result.replace(new RegExp(`\\{#text_${n}\\}`, 'g'), item.textContent || '');
-          result = result.replace(new RegExp(`\\{#link_${n}\\}`, 'g'), item.linkUrl || '');
-          result = result.replace(new RegExp(`\\{#video_${n}\\}`, 'g'), item.videoUrl || '');
-          result = result.replace(new RegExp(`\\{#target_${n}\\}`, 'g'), item.linkTarget || '_self');
-          result = result.replace(new RegExp(`\\{#title_${n}\\}`, 'g'), item.title || '');
-          result = result.replace(new RegExp(`\\{#html_${n}\\}`, 'g'), item.htmlContent || '');
+          outsideLoops = outsideLoops.replace(new RegExp(`\\{#img_${n}\\}`, 'g'), item.imgUrl || '');
+          outsideLoops = outsideLoops.replace(new RegExp(`\\{#text_${n}\\}`, 'g'), item.textContent || '');
+          outsideLoops = outsideLoops.replace(new RegExp(`\\{#link_${n}\\}`, 'g'), item.linkUrl || '');
+          outsideLoops = outsideLoops.replace(new RegExp(`\\{#video_${n}\\}`, 'g'), item.videoUrl || '');
+          outsideLoops = outsideLoops.replace(new RegExp(`\\{#target_${n}\\}`, 'g'), item.linkTarget || '_self');
+          outsideLoops = outsideLoops.replace(new RegExp(`\\{#title_${n}\\}`, 'g'), item.title || '');
+          outsideLoops = outsideLoops.replace(new RegExp(`\\{#html_${n}\\}`, 'g'), item.htmlContent || '');
 
-          // {#img_N_or_video_N} — 이미지 우선, 없으면 비디오
           const mediaRegex = new RegExp(`\\{#img_${n}_or_video_${n}\\}`, 'g');
-          result = result.replace(mediaRegex, () => {
+          outsideLoops = outsideLoops.replace(mediaRegex, () => {
             if (item.imgUrl) return `<img src="${item.imgUrl}" alt="${item.title || ''}" loading="lazy">`;
             if (item.videoUrl) return `<video src="${item.videoUrl}" autoplay muted loop playsinline></video>`;
             return '';
           });
         }
 
-        // 배너 루프 — area 범위 안에서만 처리
+        // 루프 블록 복원
+        result = outsideLoops.replace(/__BLOOP_(\d+)__/g, (_, idx) => loopBlocks[parseInt(idx)]);
+
+        // ── 배너 루프 — area 범위 안에서만 처리 ──
+        // 루프 안 {#text_N} → 현재 아이템의 texts[N-1], {#img_N} → images[N-1] 등
         result = result.replace(/<!--@banner_loop-->([\s\S]*?)<!--@end_banner_loop-->/g, (loopMatch, template) => {
           if (items.length === 0) {
             return '<!-- no banner data -->';
           }
           return items.map(item => {
-            return template
+            let rendered = template
               .replace(/\{#img\}/g, item.imgUrl || '')
               .replace(/\{#text\}/g, item.textContent || '')
               .replace(/\{#link\}/g, item.linkUrl || '')
@@ -505,6 +516,29 @@ async function processBannerAreas(siteId: string, html: string): Promise<string>
                 if (item.videoUrl) return `<video src="${item.videoUrl}" autoplay muted loop playsinline></video>`;
                 return '';
               });
+
+            // 번호 기반 → 현재 아이템의 JSON 배열에서 N번째 (1-indexed)
+            const itemTexts = (item.texts || []) as string[];
+            const itemImages = (item.images || []) as string[];
+            const itemVideos = (item.videos || []) as string[];
+            const itemLinks = (item.links || []) as Array<{ url?: string; target?: string }>;
+
+            rendered = rendered
+              .replace(/\{#text_(\d+)\}/g, (_m: string, n: string) => itemTexts[parseInt(n) - 1] || '')
+              .replace(/\{#img_(\d+)\}/g, (_m: string, n: string) => itemImages[parseInt(n) - 1] || '')
+              .replace(/\{#video_(\d+)\}/g, (_m: string, n: string) => itemVideos[parseInt(n) - 1] || '')
+              .replace(/\{#link_(\d+)\}/g, (_m: string, n: string) => itemLinks[parseInt(n) - 1]?.url || '')
+              .replace(/\{#target_(\d+)\}/g, (_m: string, n: string) => itemLinks[parseInt(n) - 1]?.target || '_self')
+              .replace(/\{#title_(\d+)\}/g, (_m: string, n: string) => itemTexts[parseInt(n) - 1] || '')
+              .replace(/\{#img_(\d+)_or_video_\1\}/g, (_m: string, n: string) => {
+                const img = itemImages[parseInt(n) - 1];
+                const vid = itemVideos[parseInt(n) - 1];
+                if (img) return `<img src="${img}" alt="${item.title || ''}" loading="lazy">`;
+                if (vid) return `<video src="${vid}" autoplay muted loop playsinline></video>`;
+                return '';
+              });
+
+            return rendered;
           }).join('\n');
         });
 
