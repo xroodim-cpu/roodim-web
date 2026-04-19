@@ -24,6 +24,7 @@ interface TopMenu {
   subMenus?: SubMenu[];
 }
 
+// 고객 어드민 5대 핵심 메뉴 — 대시보드·예약·작업·주소록·워크보드
 const TOP_MENUS: TopMenu[] = [
   {
     key: 'dashboard',
@@ -48,25 +49,9 @@ const TOP_MENUS: TopMenu[] = [
     ],
   },
   {
-    key: 'services',
-    label: '시술',
-    href: '/services',
-  },
-  {
-    key: 'boards',
-    label: '게시판',
-    href: '/boards',
-  },
-  {
-    key: 'site',
-    label: '사이트',
-    href: '/site',
-    subMenus: [
-      { key: 'info', label: '기본정보', href: '/site' },
-      { key: 'seo', label: 'SEO/마케팅', href: '/site/seo' },
-      { key: 'sections', label: '섹션 관리', href: '/site/sections' },
-      { key: 'menus', label: '메뉴 관리', href: '/site/menus' },
-    ],
+    key: 'address-book',
+    label: '주소록',
+    href: '/address-book',
   },
 ];
 

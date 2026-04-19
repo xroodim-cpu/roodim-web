@@ -1,56 +1,18 @@
 import { db } from '@/lib/db';
-import { sites, reservations, maintenanceRequests } from '@/drizzle/schema';
-import { eq, and, gte } from 'drizzle-orm';
+import {
+  sites,
+  reservations,
+  maintenanceRequests,
+  workboardMembers,
+  workboards,
+  boardPosts,
+  boards,
+} from '@/drizzle/schema';
+import { eq, and, gte, lt, desc, inArray } from 'drizzle-orm';
+import Link from 'next/link';
 
 interface DashboardPageProps {
   params: Promise<{ slug: string }>;
-}
-
-async function getDashboardStats(siteId: string) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  // 오늘 예약 수
-  const todayReservations = await db
-    .select()
-    .from(reservations)
-    .where(
-      and(
-        eq(reservations.siteId, siteId),
-        gte(reservations.reservedDate, today.toISOString().split('T')[0])
-      )
-    );
-
-  // 미처리 작업 수
-  const pendingWork = await db
-    .select()
-    .from(maintenanceRequests)
-    .where(
-      and(
-        eq(maintenanceRequests.siteId, siteId),
-        eq(maintenanceRequests.status, 'pending')
-      )
-    );
-
-  // 최근 활동
-  const recentReservations = await db
-    .select()
-    .from(reservations)
-    .where(eq(reservations.siteId, siteId))
-    .orderBy((t) => t.createdAt)
-    .limit(5);
-
-  return {
-    totalReservations: todayReservations.length,
-    pendingWork: pendingWork.length,
-    recentActivities: recentReservations.map((r) => ({
-      id: r.id,
-      type: 'reservation',
-      title: `${r.customerName} 님 예약`,
-      date: r.reservedDate,
-      status: r.status,
-    })),
-  };
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -67,117 +29,474 @@ const STATUS_BADGE: Record<string, string> = {
   completed: 'c-badge-success',
 };
 
+const WORK_STATUS_LABEL: Record<string, string> = {
+  pending: '대기',
+  reviewing: '검토 중',
+  working: '진행 중',
+  done: '완료',
+  cancelled: '취소',
+};
+
+const WORK_STATUS_BADGE: Record<string, string> = {
+  pending: 'c-badge-warning',
+  reviewing: 'c-badge-info',
+  working: 'c-badge-info',
+  done: 'c-badge-success',
+  cancelled: 'c-badge-error',
+};
+
+function toDateStr(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
 export default async function DashboardPage({ params }: DashboardPageProps) {
   const { slug } = await params;
 
-  // 사이트 조회
   const site = await db.query.sites.findFirst({
     where: eq(sites.slug, slug),
   });
-
   if (!site) {
-    return (
-      <div className="c-alert c-alert-error">사이트를 찾을 수 없습니다.</div>
-    );
+    return <div className="c-alert c-alert-error">사이트를 찾을 수 없습니다.</div>;
   }
 
-  const stats = await getDashboardStats(site.id);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = toDateStr(today);
+
+  const weekLater = new Date(today);
+  weekLater.setDate(weekLater.getDate() + 7);
+  const weekLaterStr = toDateStr(weekLater);
+
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const monthStartStr = toDateStr(monthStart);
+  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  const monthEndStr = toDateStr(monthEnd);
+
+  // 오늘 예약
+  const todayReservations = await db
+    .select()
+    .from(reservations)
+    .where(
+      and(
+        eq(reservations.siteId, site.id),
+        gte(reservations.reservedDate, todayStr),
+        lt(reservations.reservedDate, toDateStr(new Date(today.getTime() + 86400000))),
+      ),
+    )
+    .orderBy(reservations.reservedTime);
+
+  // 이번 주 예약 (오늘 포함 7일)
+  const upcomingReservations = await db
+    .select()
+    .from(reservations)
+    .where(
+      and(
+        eq(reservations.siteId, site.id),
+        gte(reservations.reservedDate, todayStr),
+        lt(reservations.reservedDate, weekLaterStr),
+      ),
+    )
+    .orderBy(reservations.reservedDate, reservations.reservedTime);
+
+  // 이번 달 예약 수
+  const monthReservations = await db
+    .select()
+    .from(reservations)
+    .where(
+      and(
+        eq(reservations.siteId, site.id),
+        gte(reservations.reservedDate, monthStartStr),
+        lt(reservations.reservedDate, monthEndStr),
+      ),
+    );
+
+  // 미처리 작업
+  const pendingWork = await db
+    .select()
+    .from(maintenanceRequests)
+    .where(
+      and(
+        eq(maintenanceRequests.siteId, site.id),
+        inArray(maintenanceRequests.status, ['pending', 'reviewing', 'working']),
+      ),
+    )
+    .orderBy(desc(maintenanceRequests.createdAt))
+    .limit(5);
+
+  // 워크보드 최근 소식 — 이 사이트가 속한 워크보드의 게시물
+  const myWb = await db
+    .select({ wbId: workboardMembers.workboardId, wbName: workboards.name })
+    .from(workboardMembers)
+    .innerJoin(workboards, eq(workboards.id, workboardMembers.workboardId))
+    .where(eq(workboardMembers.siteId, site.id))
+    .limit(3);
+
+  let recentPosts: Array<{
+    id: number;
+    title: string;
+    authorName: string | null;
+    createdAt: Date;
+    boardName: string;
+    workboardName: string;
+  }> = [];
+  if (myWb.length > 0) {
+    const wbIds = myWb.map((w) => w.wbId);
+    // workboard → board → posts 조인
+    const boardRows = await db
+      .select()
+      .from(boards)
+      .where(inArray(boards.siteId, wbIds.length > 0 ? [site.id] : [site.id]));
+    const boardIds = boardRows.map((b) => b.id);
+    if (boardIds.length > 0) {
+      const posts = await db
+        .select()
+        .from(boardPosts)
+        .where(inArray(boardPosts.boardId, boardIds))
+        .orderBy(desc(boardPosts.createdAt))
+        .limit(5);
+      recentPosts = posts.map((p) => ({
+        id: p.id,
+        title: p.title,
+        authorName: p.authorName,
+        createdAt: p.createdAt,
+        boardName: boardRows.find((b) => b.id === p.boardId)?.name ?? '',
+        workboardName: myWb[0].wbName,
+      }));
+    }
+  }
+
+  const reservationsByStatus = {
+    pending: upcomingReservations.filter((r) => r.status === 'pending').length,
+    confirmed: upcomingReservations.filter((r) => r.status === 'confirmed').length,
+  };
 
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
         <h1 className="c-page-title">대시보드</h1>
-        <p className="c-page-subtitle">
-          사이트 운영 현황을 한눈에 확인하세요.
-        </p>
+        <p className="c-page-subtitle">예약과 작업을 한눈에 확인하세요.</p>
       </div>
 
-      {/* 통계 카드 */}
-      <div className="stats-grid">
-        <div className="stat-card">
+      {/* 상단 통계 카드 4개 */}
+      <div className="stats-grid" style={{ marginBottom: 'var(--sp-xl)' }}>
+        <Link
+          href={`/admin/${slug}/reservations`}
+          className="stat-card"
+          style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}
+        >
           <div className="stat-icon red">
             <span style={{ fontSize: 22 }}>📅</span>
           </div>
           <div className="stat-info">
-            <div className="stat-value">{stats.totalReservations}</div>
-            <div className="stat-label">오늘의 예약</div>
+            <div className="stat-value">{todayReservations.length}</div>
+            <div className="stat-label">오늘 예약</div>
           </div>
-        </div>
+        </Link>
 
-        <div className="stat-card">
+        <Link
+          href={`/admin/${slug}/reservations`}
+          className="stat-card"
+          style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}
+        >
+          <div className="stat-icon blue">
+            <span style={{ fontSize: 22 }}>🗓</span>
+          </div>
+          <div className="stat-info">
+            <div className="stat-value">{upcomingReservations.length}</div>
+            <div className="stat-label">이번 주 예약</div>
+          </div>
+        </Link>
+
+        <Link
+          href={`/admin/${slug}/reservations`}
+          className="stat-card"
+          style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}
+        >
+          <div className="stat-icon green">
+            <span style={{ fontSize: 22 }}>📊</span>
+          </div>
+          <div className="stat-info">
+            <div className="stat-value">{monthReservations.length}</div>
+            <div className="stat-label">이번 달 예약</div>
+          </div>
+        </Link>
+
+        <Link
+          href={`/admin/${slug}/work`}
+          className="stat-card"
+          style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}
+        >
           <div className="stat-icon yellow">
             <span style={{ fontSize: 22 }}>🔧</span>
           </div>
           <div className="stat-info">
-            <div className="stat-value">{stats.pendingWork}</div>
-            <div className="stat-label">미처리 작업</div>
+            <div className="stat-value">{pendingWork.length}</div>
+            <div className="stat-label">진행 중 작업</div>
           </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon blue">
-            <span style={{ fontSize: 22 }}>👥</span>
-          </div>
-          <div className="stat-info">
-            <div className="stat-value">126</div>
-            <div className="stat-label">이번 달 방문자</div>
-          </div>
-        </div>
+        </Link>
       </div>
 
-      {/* 최근 활동 */}
+      {/* 2단 그리드: 예약 영역 (큰) + 작업/워크보드 (작은) */}
       <div
-        className="card"
         style={{
-          border: '1px solid var(--border)',
-          padding: 20,
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1.8fr) minmax(0, 1fr)',
+          gap: 'var(--sp-lg)',
+          alignItems: 'start',
         }}
       >
-        <div className="card-header">
-          <div>
-            <div className="card-title">최근 활동</div>
-            <div className="card-subtitle">최근 5건의 예약</div>
+        {/* 좌측: 예약 중심 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-lg)' }}>
+          {/* 오늘의 예약 */}
+          <div
+            className="card"
+            style={{
+              border: '1px solid var(--border)',
+              padding: 20,
+              borderLeft: '4px solid var(--accent)',
+            }}
+          >
+            <div
+              className="card-header"
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
+              <div>
+                <div className="card-title">📅 오늘의 예약</div>
+                <div className="card-subtitle">
+                  {today.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' })}
+                </div>
+              </div>
+              <Link
+                href={`/admin/${slug}/reservations`}
+                className="btn btn-ghost btn-sm"
+                style={{ textDecoration: 'none' }}
+              >
+                전체보기 →
+              </Link>
+            </div>
+            {todayReservations.length === 0 ? (
+              <div className="c-empty" style={{ padding: 'var(--sp-xl)' }}>
+                <div className="c-empty-icon">📭</div>
+                <div className="c-empty-text">오늘 예약이 없습니다.</div>
+              </div>
+            ) : (
+              <div className="table-wrap">
+                <table className="c-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 80 }}>시간</th>
+                      <th>고객명</th>
+                      <th>시술</th>
+                      <th style={{ textAlign: 'right' }}>상태</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {todayReservations.map((r) => (
+                      <tr key={r.id}>
+                        <td style={{ fontWeight: 600, color: 'var(--accent)' }}>
+                          {(r.reservedTime as unknown as string)?.slice(0, 5) || '—'}
+                        </td>
+                        <td style={{ fontWeight: 'var(--fw-semi)' }}>
+                          {r.customerName}
+                          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 400 }}>
+                            {r.customerPhone}
+                          </div>
+                        </td>
+                        <td style={{ color: 'var(--text-secondary)' }}>
+                          {r.treatmentName || '—'}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <span
+                            className={`c-badge ${STATUS_BADGE[r.status] || 'c-badge-gray'}`}
+                          >
+                            {STATUS_LABEL[r.status] || r.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* 다가오는 예약 (7일) */}
+          <div className="card" style={{ border: '1px solid var(--border)', padding: 20 }}>
+            <div
+              className="card-header"
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
+              <div>
+                <div className="card-title">🗓 다가오는 예약 (7일)</div>
+                <div className="card-subtitle">
+                  대기 {reservationsByStatus.pending}건 · 확정 {reservationsByStatus.confirmed}건
+                </div>
+              </div>
+            </div>
+            {upcomingReservations.length === 0 ? (
+              <div className="c-empty" style={{ padding: 'var(--sp-xl)' }}>
+                <div className="c-empty-icon">📅</div>
+                <div className="c-empty-text">다가오는 예약이 없습니다.</div>
+              </div>
+            ) : (
+              <div className="table-wrap">
+                <table className="c-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 110 }}>날짜</th>
+                      <th style={{ width: 70 }}>시간</th>
+                      <th>고객명</th>
+                      <th>시술</th>
+                      <th style={{ textAlign: 'right' }}>상태</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {upcomingReservations.slice(0, 10).map((r) => (
+                      <tr key={r.id}>
+                        <td style={{ color: 'var(--text-secondary)' }}>
+                          {new Date((r.reservedDate as unknown as string) + 'T00:00:00').toLocaleDateString(
+                            'ko-KR',
+                            { month: 'numeric', day: 'numeric', weekday: 'short' },
+                          )}
+                        </td>
+                        <td style={{ fontWeight: 600 }}>
+                          {(r.reservedTime as unknown as string)?.slice(0, 5) || '—'}
+                        </td>
+                        <td style={{ fontWeight: 'var(--fw-semi)' }}>{r.customerName}</td>
+                        <td style={{ color: 'var(--text-secondary)' }}>
+                          {r.treatmentName || '—'}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <span
+                            className={`c-badge ${STATUS_BADGE[r.status] || 'c-badge-gray'}`}
+                          >
+                            {STATUS_LABEL[r.status] || r.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
-        {stats.recentActivities.length === 0 ? (
-          <div className="c-empty">
-            <div className="c-empty-icon">📭</div>
-            <div className="c-empty-text">최근 활동이 없습니다.</div>
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table className="c-table">
-              <thead>
-                <tr>
-                  <th>내용</th>
-                  <th>날짜</th>
-                  <th style={{ textAlign: 'right' }}>상태</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.recentActivities.map((activity) => (
-                  <tr key={activity.id}>
-                    <td style={{ fontWeight: 'var(--fw-semi)' }}>
-                      {activity.title}
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)' }}>
-                      {new Date(activity.date).toLocaleDateString('ko-KR')}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <span
-                        className={`c-badge ${
-                          STATUS_BADGE[activity.status] || 'c-badge-gray'
-                        }`}
-                      >
-                        {STATUS_LABEL[activity.status] || activity.status}
+
+        {/* 우측: 작업 + 워크보드 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-lg)' }}>
+          {/* 진행 중 작업 */}
+          <div className="card" style={{ border: '1px solid var(--border)', padding: 20 }}>
+            <div
+              className="card-header"
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
+              <div>
+                <div className="card-title">🔧 진행 중 작업</div>
+                <div className="card-subtitle">최근 5건</div>
+              </div>
+              <Link
+                href={`/admin/${slug}/work`}
+                className="btn btn-ghost btn-sm"
+                style={{ textDecoration: 'none' }}
+              >
+                전체보기 →
+              </Link>
+            </div>
+            {pendingWork.length === 0 ? (
+              <div
+                style={{ padding: 'var(--sp-lg)', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}
+              >
+                진행 중인 작업이 없습니다.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {pendingWork.map((w) => (
+                  <div
+                    key={w.id}
+                    style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 6 }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                        marginBottom: 4,
+                      }}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {w.title}
+                      </div>
+                      <span className={`c-badge ${WORK_STATUS_BADGE[w.status] || 'c-badge-gray'}`}>
+                        {WORK_STATUS_LABEL[w.status] || w.status}
                       </span>
-                    </td>
-                  </tr>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                      {new Date(w.createdAt).toLocaleDateString('ko-KR')}
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* 워크보드 최근 소식 */}
+          <div className="card" style={{ border: '1px solid var(--border)', padding: 20 }}>
+            <div
+              className="card-header"
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            >
+              <div>
+                <div className="card-title">📢 워크보드 소식</div>
+                <div className="card-subtitle">
+                  {myWb[0]?.wbName ?? '파트너 공유 보드'}
+                </div>
+              </div>
+              {myWb.length > 0 && (
+                <Link
+                  href={`/admin/${slug}/workboard`}
+                  className="btn btn-ghost btn-sm"
+                  style={{ textDecoration: 'none' }}
+                >
+                  전체보기 →
+                </Link>
+              )}
+            </div>
+            {recentPosts.length === 0 ? (
+              <div
+                style={{ padding: 'var(--sp-lg)', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}
+              >
+                최근 게시물이 없습니다.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {recentPosts.map((p) => (
+                  <div
+                    key={p.id}
+                    style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 6 }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        marginBottom: 4,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {p.title}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                      {p.boardName} · {p.authorName ?? '파트너'} ·{' '}
+                      {new Date(p.createdAt).toLocaleDateString('ko-KR')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
