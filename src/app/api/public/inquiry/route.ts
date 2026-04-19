@@ -191,13 +191,16 @@ function escapeHtml(str: string): string {
 
 /**
  * partner / creator 사이트 문의 → 루딤링크(Laravel) API 로 전달.
- * 회원 조직 사용자는 루딤웹 어드민에 접근하지 않으므로 루딤링크 게시판에 저장해야 함.
- * Laravel `/api/sites/{slug}/bulletins/inquiry/submit` 는 slug 로 target org 를 resolve:
- *  - 회원사이트(partner/creator) → 루딤 마스터 bulletin
- *  - 고객사이트(customer) → 파트너 조직 bulletin
+ * Laravel API env 미설정(HMAC key 없음) 시 자동 fallback — roodim-web PG 에 저장.
+ *
+ * 1차: `/api/sites/{slug}/bulletins/inquiry/submit` (Laravel) 호출
+ *   - 성공 시 Laravel bulletins 테이블 + 담당자 알림 발송
+ *   - 실패 시 (HMAC 미설정 / 네트워크 / Laravel 에러) 2차로 넘어감
+ * 2차: roodim-web DB board_posts 에 직접 저장 (데이터 손실 방지)
+ *   - 나중에 Laravel env 설정되면 별도 sync 작업으로 이관 가능
  */
 async function handlePartnerInquiry(
-  site: { adminOrganizationId: number | null },
+  site: { id: string; adminOrganizationId: number | null; siteType: string },
   body: Record<string, unknown>,
   slug: string,
 ): Promise<NextResponse> {
@@ -213,16 +216,14 @@ async function handlePartnerInquiry(
     );
   }
 
-  // Laravel 은 fields 우선, 없으면 content 로 저장하도록 완화됨.
-  // fields 가 있으면 그대로 전달. 없으면 unified content 에서 간이 fields 재구성.
   let payloadFields: Record<string, string> | undefined;
   if (hasFields) {
     payloadFields = fields as Record<string, string>;
   } else if (useUnified) {
-    // unified content → `<p><strong>라벨</strong>: 값</p>` 패턴에서 fields 객체 복원
     payloadFields = parseUnifiedToFields(String(content));
   }
 
+  // ── 1차 시도: Laravel Bridge API ──
   const result = await adminApi<{ ok: boolean; post_id?: number; message?: string }>(
     'POST',
     `/api/sites/${encodeURIComponent(slug)}/bulletins/inquiry/submit`,
@@ -231,19 +232,75 @@ async function handlePartnerInquiry(
       : { content: String(content ?? ''), mode: 'unified' },
   );
 
-  if (!result.ok) {
-    console.error('[POST /api/public/inquiry] Laravel inquiry submit error:', result.error);
+  if (result.ok) {
+    return NextResponse.json({
+      ok: true,
+      message: result.data?.message || '문의가 접수되었습니다.',
+      postId: result.data?.post_id,
+    });
+  }
+
+  // ── 2차 fallback: roodim-web PG 에 직접 저장 ──
+  // Laravel API env 미설정이나 503/401 상황에서도 문의 데이터 유실 방지
+  console.warn('[POST /api/public/inquiry] Laravel submit failed, falling back to PG:', result.error);
+
+  try {
+    await ensureSystemBoards(site.id);
+    const [inquiryBoard] = await db
+      .select()
+      .from(boards)
+      .where(and(eq(boards.siteId, site.id), eq(boards.systemKey, 'inquiry')))
+      .limit(1);
+
+    if (!inquiryBoard) {
+      return NextResponse.json({ error: 'Fallback 실패: 문의게시판 없음' }, { status: 500 });
+    }
+
+    const entries = payloadFields ? Object.entries(payloadFields) : [];
+    const authorName = extractField(entries as [string, string][], ['성함', '이름', '담당자', 'name', '성명']) || '방문자';
+    const authorPhone = extractField(entries as [string, string][], ['연락처', '전화', '핸드폰', '휴대폰', 'phone', '전화번호']);
+    const authorEmail = extractField(entries as [string, string][], ['이메일', 'email', 'e-mail']);
+    const companyName = extractField(entries as [string, string][], ['병원명', '회사명', '업체명', '상호', 'company']);
+
+    const finalContent = useUnified
+      ? String(content).trim()
+      : (entries as [string, string][])
+          .map(([k, v]) => `<p><strong>${escapeHtml(k)}</strong> : ${escapeHtml(String(v))}</p>`)
+          .join('\n');
+
+    const titleSeed = [companyName, authorName].filter(Boolean).join(' / ');
+    const finalTitle = titleSeed
+      ? `문의 — ${titleSeed}`
+      : `상담 요청 — ${new Date().toLocaleString('ko-KR')}`;
+
+    const [post] = await db.insert(boardPosts).values({
+      boardId: inquiryBoard.id,
+      siteId: site.id,
+      title: finalTitle,
+      content: finalContent,
+      authorName,
+      authorEmail: authorEmail || null,
+      authorPhone: authorPhone || null,
+      formData: {
+        __fallback: true,
+        __laravel_error: result.error || 'unknown',
+        fields: payloadFields || {},
+      },
+    }).returning();
+
+    return NextResponse.json({
+      ok: true,
+      message: '문의가 접수되었습니다.',
+      postId: post.id,
+      __note: 'Saved to PG fallback (Laravel API env 미설정)',
+    });
+  } catch (e) {
+    console.error('[POST /api/public/inquiry] PG fallback failed:', e);
     return NextResponse.json(
-      { error: result.error || '문의 접수 중 오류가 발생했습니다.' },
+      { error: '문의 접수 중 오류가 발생했습니다.' },
       { status: 500 },
     );
   }
-
-  return NextResponse.json({
-    ok: true,
-    message: result.data?.message || '문의가 접수되었습니다.',
-    postId: result.data?.post_id,
-  });
 }
 
 /** unified HTML (`<p><strong>라벨</strong>: 값</p>`...) 에서 { 라벨: 값 } 객체 복원 */
