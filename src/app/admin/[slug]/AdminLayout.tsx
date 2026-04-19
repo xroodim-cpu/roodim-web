@@ -274,6 +274,23 @@ export default function AdminLayout({
         </main>
       )}
 
+      {/* ===== 모바일 하단 고정 바 (아이콘 전용) — 루딤링크 app.blade 와 동일 ===== */}
+      <nav className="topnav-bottom-bar" aria-label="주요 메뉴">
+        {allMenus.map((menu) => (
+          <Link
+            key={menu.key}
+            href={`/admin/${slug}${menu.href}`}
+            className={`topnav-bottom-link${
+              activeTopKey === menu.key ? ' active' : ''
+            }`}
+            aria-label={menu.label}
+            title={menu.label}
+          >
+            <span className="material-symbols-rounded">{menu.icon}</span>
+          </Link>
+        ))}
+      </nav>
+
       {/* 모바일 오버레이 */}
       {sideOpen && (
         <div
