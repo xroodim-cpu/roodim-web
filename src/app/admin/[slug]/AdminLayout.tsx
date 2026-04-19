@@ -21,25 +21,19 @@ interface TopMenu {
   key: string;
   label: string;
   href: string;
+  icon: string;
   subMenus?: SubMenu[];
 }
 
-// 고객 어드민 5대 핵심 메뉴 — 대시보드·예약·작업·주소록·워크보드
+// 고객 어드민 5대 핵심 메뉴 — 루딤링크 상단 네비와 동일 구조 (아이콘 + 텍스트)
 const TOP_MENUS: TopMenu[] = [
-  {
-    key: 'dashboard',
-    label: '대시보드',
-    href: '/dashboard',
-  },
-  {
-    key: 'reservations',
-    label: '예약',
-    href: '/reservations',
-  },
+  { key: 'dashboard', label: '대시보드', href: '/dashboard', icon: 'dashboard' },
+  { key: 'reservations', label: '예약', href: '/reservations', icon: 'event_note' },
   {
     key: 'work',
     label: '작업',
     href: '/work',
+    icon: 'task_alt',
     subMenus: [
       { key: 'all', label: '전체', href: '/work' },
       { key: 'pending', label: '대기', href: '/work?status=pending' },
@@ -48,22 +42,8 @@ const TOP_MENUS: TopMenu[] = [
       { key: 'done', label: '완료', href: '/work?status=done' },
     ],
   },
-  {
-    key: 'address-book',
-    label: '주소록',
-    href: '/address-book',
-  },
+  { key: 'address-book', label: '주소록', href: '/address-book', icon: 'contacts' },
 ];
-
-function HamburgerIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-      <line x1="3" y1="6" x2="21" y2="6" />
-      <line x1="3" y1="12" x2="21" y2="12" />
-      <line x1="3" y1="18" x2="21" y2="18" />
-    </svg>
-  );
-}
 
 export default function AdminLayout({
   slug,
@@ -73,21 +53,17 @@ export default function AdminLayout({
 }: AdminLayoutProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [sideOpen, setSideOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const allMenus: TopMenu[] = hasWorkboard
     ? [
         ...TOP_MENUS,
-        {
-          key: 'workboard',
-          label: '워크보드',
-          href: '/workboard',
-        },
+        { key: 'workboard', label: '워크보드', href: '/workboard', icon: 'forum' },
       ]
     : TOP_MENUS;
 
-  // 현재 메뉴 활성화 판별 (slug 뒤의 첫 경로 segment)
   const getActiveTopKey = () => {
     const pathAfterSlug = pathname.split(`/admin/${slug}`)[1] || '/dashboard';
     const segments = pathAfterSlug.split('/').filter(Boolean);
@@ -99,16 +75,13 @@ export default function AdminLayout({
   const subMenus = activeTop?.subMenus || [];
   const hasSubMenus = subMenus.length > 0;
 
-  // 사이드바 서브 메뉴 active 판별 (pathname + 쿼리스트링 둘 다 매칭)
   const isSubActive = (subHref: string) => {
     const [hrefPath, hrefQuery] = subHref.split('?');
     const fullPath = `/admin/${slug}${hrefPath}`;
     if (pathname !== fullPath) return false;
-
     if (!hrefQuery) {
       return !searchParams.toString() || !searchParams.has('status');
     }
-
     const expected = new URLSearchParams(hrefQuery);
     for (const [k, v] of expected.entries()) {
       if (searchParams.get(k) !== v) return false;
@@ -120,32 +93,46 @@ export default function AdminLayout({
 
   return (
     <>
-      {/* 상단 메인 네비게이션 */}
+      {/* ===== 상단 네비게이션 — 루딤링크 app.blade 구조 그대로 ===== */}
       <nav className="topnav">
         <div className="topnav-inner">
-          {hasSubMenus && (
-            <button
-              type="button"
-              className="topnav-side-toggle"
-              onClick={() => setSideOpen((v) => !v)}
-              aria-label="사이드 메뉴"
-            >
-              <HamburgerIcon />
-            </button>
-          )}
-
-          <Link
-            href={`/admin/${slug}/dashboard`}
-            className="topnav-brand"
+          {/* 모바일 좌측 토글 */}
+          <button
+            className="topnav-side-toggle"
+            type="button"
+            onClick={() => setSideOpen((v) => !v)}
+            aria-label="메뉴"
           >
-            <span className="user-avatar" style={{ width: 34, height: 34 }}>
+            <span className="material-symbols-rounded">menu</span>
+          </button>
+
+          {/* 브랜드 로고 + 사이트명 */}
+          <Link href={`/admin/${slug}/dashboard`} className="topnav-brand">
+            <span
+              className="topnav-brand-text"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 8,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 16,
+                fontWeight: 800,
+                color: '#fff',
+                background: 'var(--accent)',
+                flexShrink: 0,
+              }}
+            >
               {brandInitial}
             </span>
             <span className="topnav-brand-text">{siteName}</span>
           </Link>
 
+          {/* 중앙 메뉴 */}
           <div
             className={`topnav-menu${mobileMenuOpen ? ' mobile-open' : ''}`}
+            id="topnavMenu"
           >
             {allMenus.map((menu) => (
               <Link
@@ -156,45 +143,95 @@ export default function AdminLayout({
                 }`}
                 onClick={() => setMobileMenuOpen(false)}
               >
-                {menu.label}
+                <span className="material-symbols-rounded">{menu.icon}</span>
+                <span>{menu.label}</span>
               </Link>
             ))}
           </div>
 
+          {/* 우측 액션 */}
           <div className="topnav-actions">
-            <button type="button" className="btn btn-ghost btn-sm">
-              프로필
-            </button>
             <button
+              className="topnav-icon-btn"
               type="button"
-              className="topnav-side-toggle"
-              onClick={() => setMobileMenuOpen((v) => !v)}
-              aria-label="메뉴"
+              aria-label="알림"
             >
-              <HamburgerIcon />
+              <span className="material-symbols-rounded">notifications</span>
+            </button>
+
+            <div style={{ position: 'relative' }}>
+              <button
+                className="topnav-profile-btn"
+                type="button"
+                onClick={() => setProfileOpen((v) => !v)}
+                aria-label="프로필 메뉴"
+              >
+                <div className="user-avatar">{brandInitial}</div>
+              </button>
+              {profileOpen && (
+                <div
+                  className="topnav-popup"
+                  style={{ display: 'block', width: 260 }}
+                >
+                  <div
+                    className="topnav-popup-header"
+                    style={{
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      gap: 2,
+                    }}
+                  >
+                    <span style={{ fontWeight: 700, fontSize: 16 }}>
+                      {siteName}
+                    </span>
+                    <span
+                      style={{ fontSize: 14, color: 'var(--text-tertiary)' }}
+                    >
+                      {slug}
+                    </span>
+                  </div>
+                  <Link
+                    href={`/admin/${slug}/dashboard`}
+                    className="topnav-popup-item"
+                    onClick={() => setProfileOpen(false)}
+                  >
+                    <span className="material-symbols-rounded">dashboard</span>
+                    대시보드
+                  </Link>
+                  <a
+                    href={`/admin/login/${slug}`}
+                    className="topnav-popup-item"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      await fetch('/api/auth/site-logout', { method: 'POST' });
+                      window.location.href = `/admin/login/${slug}`;
+                    }}
+                  >
+                    <span className="material-symbols-rounded">logout</span>
+                    로그아웃
+                  </a>
+                </div>
+              )}
+            </div>
+
+            <button
+              className="topnav-icon-btn topnav-side-toggle"
+              type="button"
+              onClick={() => setMobileMenuOpen((v) => !v)}
+              aria-label="모바일 메뉴"
+              style={{ display: 'none' }}
+            >
+              <span className="material-symbols-rounded">more_vert</span>
             </button>
           </div>
         </div>
       </nav>
 
-      {/* 메인 레이아웃 */}
+      {/* ===== 메인 레이아웃 — 루딤링크 .wb-wrap 구조 ===== */}
       {hasSubMenus ? (
         <div className="wb-wrap">
           <aside className={`wb-side${sideOpen ? ' open' : ''}`}>
-            <div
-              style={{
-                fontSize: 'var(--fs-xs)',
-                fontWeight: 'var(--fw-bold)',
-                color: 'var(--text-tertiary)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                padding: '0 12px 12px',
-                borderBottom: '1px solid var(--border)',
-                marginBottom: '12px',
-              }}
-            >
-              {activeTop?.label}
-            </div>
+            <div className="pd-side-title">{activeTop?.label}</div>
             <div className="pd-side-group">
               {subMenus.map((sub) => (
                 <Link
@@ -210,15 +247,15 @@ export default function AdminLayout({
               ))}
             </div>
           </aside>
-          <main className="wb-main" style={{ paddingTop: 24 }}>
-            {children}
-          </main>
+          <main className="wb-main">{children}</main>
         </div>
       ) : (
         <main
           className="wb-main"
           style={{
-            paddingTop: 24,
+            maxWidth: 'var(--content-max, 1280px)',
+            margin: '0 auto',
+            padding: 'var(--sp-xl) var(--sp-xl)',
             minHeight: 'calc(100vh - var(--header-height, 60px))',
           }}
         >
@@ -233,10 +270,14 @@ export default function AdminLayout({
           onClick={() => setSideOpen(false)}
         />
       )}
-      {mobileMenuOpen && (
+      {profileOpen && (
         <div
-          className="topnav-drawer-overlay show"
-          onClick={() => setMobileMenuOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1,
+          }}
+          onClick={() => setProfileOpen(false)}
         />
       )}
     </>

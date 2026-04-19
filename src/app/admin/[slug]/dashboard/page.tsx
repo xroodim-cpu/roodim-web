@@ -56,7 +56,12 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
     where: eq(sites.slug, slug),
   });
   if (!site) {
-    return <div className="c-alert c-alert-error">사이트를 찾을 수 없습니다.</div>;
+    return (
+      <div className="c-empty">
+        <div className="c-empty-icon">⚠️</div>
+        <div className="c-empty-text">사이트를 찾을 수 없습니다.</div>
+      </div>
+    );
   }
 
   const today = new Date();
@@ -72,7 +77,6 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
   const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 1);
   const monthEndStr = toDateStr(monthEnd);
 
-  // 오늘 예약
   const todayReservations = await db
     .select()
     .from(reservations)
@@ -85,7 +89,6 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
     )
     .orderBy(reservations.reservedTime);
 
-  // 이번 주 예약 (오늘 포함 7일)
   const upcomingReservations = await db
     .select()
     .from(reservations)
@@ -98,7 +101,6 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
     )
     .orderBy(reservations.reservedDate, reservations.reservedTime);
 
-  // 이번 달 예약 수
   const monthReservations = await db
     .select()
     .from(reservations)
@@ -110,7 +112,6 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
       ),
     );
 
-  // 미처리 작업
   const pendingWork = await db
     .select()
     .from(maintenanceRequests)
@@ -123,7 +124,6 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
     .orderBy(desc(maintenanceRequests.createdAt))
     .limit(5);
 
-  // 워크보드 최근 소식 — 이 사이트가 속한 워크보드의 게시물
   const myWb = await db
     .select({ wbId: workboardMembers.workboardId, wbName: workboards.name })
     .from(workboardMembers)
@@ -137,15 +137,12 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
     authorName: string | null;
     createdAt: Date;
     boardName: string;
-    workboardName: string;
   }> = [];
   if (myWb.length > 0) {
-    const wbIds = myWb.map((w) => w.wbId);
-    // workboard → board → posts 조인
     const boardRows = await db
       .select()
       .from(boards)
-      .where(inArray(boards.siteId, wbIds.length > 0 ? [site.id] : [site.id]));
+      .where(eq(boards.siteId, site.id));
     const boardIds = boardRows.map((b) => b.id);
     if (boardIds.length > 0) {
       const posts = await db
@@ -160,32 +157,27 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
         authorName: p.authorName,
         createdAt: p.createdAt,
         boardName: boardRows.find((b) => b.id === p.boardId)?.name ?? '',
-        workboardName: myWb[0].wbName,
       }));
     }
   }
 
-  const reservationsByStatus = {
-    pending: upcomingReservations.filter((r) => r.status === 'pending').length,
-    confirmed: upcomingReservations.filter((r) => r.status === 'confirmed').length,
-  };
+  const pendingCount = upcomingReservations.filter((r) => r.status === 'pending').length;
+  const confirmedCount = upcomingReservations.filter((r) => r.status === 'confirmed').length;
 
   return (
-    <div>
-      <div style={{ marginBottom: 20 }}>
-        <h1 className="c-page-title">대시보드</h1>
-        <p className="c-page-subtitle">예약과 작업을 한눈에 확인하세요.</p>
+    <>
+      <div className="c-page-header">
+        <div>
+          <h1 className="c-page-title">대시보드</h1>
+          <p className="c-page-subtitle">예약과 작업을 한눈에 확인하세요.</p>
+        </div>
       </div>
 
-      {/* 상단 통계 카드 4개 */}
-      <div className="stats-grid" style={{ marginBottom: 'var(--sp-xl)' }}>
-        <Link
-          href={`/admin/${slug}/reservations`}
-          className="stat-card"
-          style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}
-        >
+      {/* 상단 통계 카드 4개 — 루딤링크 .stats-grid / .stat-card 구조 */}
+      <div className="stats-grid">
+        <Link href={`/admin/${site.slug}/reservations`} className="stat-card">
           <div className="stat-icon red">
-            <span style={{ fontSize: 22 }}>📅</span>
+            <span className="material-symbols-rounded">event</span>
           </div>
           <div className="stat-info">
             <div className="stat-value">{todayReservations.length}</div>
@@ -193,13 +185,9 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           </div>
         </Link>
 
-        <Link
-          href={`/admin/${slug}/reservations`}
-          className="stat-card"
-          style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}
-        >
+        <Link href={`/admin/${site.slug}/reservations`} className="stat-card">
           <div className="stat-icon blue">
-            <span style={{ fontSize: 22 }}>🗓</span>
+            <span className="material-symbols-rounded">calendar_month</span>
           </div>
           <div className="stat-info">
             <div className="stat-value">{upcomingReservations.length}</div>
@@ -207,13 +195,9 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           </div>
         </Link>
 
-        <Link
-          href={`/admin/${slug}/reservations`}
-          className="stat-card"
-          style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}
-        >
+        <Link href={`/admin/${site.slug}/reservations`} className="stat-card">
           <div className="stat-icon green">
-            <span style={{ fontSize: 22 }}>📊</span>
+            <span className="material-symbols-rounded">bar_chart</span>
           </div>
           <div className="stat-info">
             <div className="stat-value">{monthReservations.length}</div>
@@ -221,13 +205,9 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           </div>
         </Link>
 
-        <Link
-          href={`/admin/${slug}/work`}
-          className="stat-card"
-          style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}
-        >
+        <Link href={`/admin/${site.slug}/work`} className="stat-card">
           <div className="stat-icon yellow">
-            <span style={{ fontSize: 22 }}>🔧</span>
+            <span className="material-symbols-rounded">build</span>
           </div>
           <div className="stat-info">
             <div className="stat-value">{pendingWork.length}</div>
@@ -236,46 +216,36 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
         </Link>
       </div>
 
-      {/* 2단 그리드: 예약 영역 (큰) + 작업/워크보드 (작은) */}
+      {/* 메인 그리드: 좌(예약 큰 카드) + 우(작업·워크보드) */}
       <div
+        className="c-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(0, 1.8fr) minmax(0, 1fr)',
           gap: 'var(--sp-lg)',
           alignItems: 'start',
+          marginTop: 'var(--sp-xl)',
         }}
       >
-        {/* 좌측: 예약 중심 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-lg)' }}>
           {/* 오늘의 예약 */}
-          <div
-            className="card"
-            style={{
-              border: '1px solid var(--border)',
-              padding: 20,
-              borderLeft: '4px solid var(--accent)',
-            }}
-          >
-            <div
-              className="card-header"
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-            >
+          <div className="card">
+            <div className="card-header">
               <div>
-                <div className="card-title">📅 오늘의 예약</div>
+                <div className="card-title">
+                  <span className="material-symbols-rounded" style={{ verticalAlign: 'middle', marginRight: 6, color: 'var(--accent)' }}>event</span>
+                  오늘의 예약
+                </div>
                 <div className="card-subtitle">
                   {today.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' })}
                 </div>
               </div>
-              <Link
-                href={`/admin/${slug}/reservations`}
-                className="btn btn-ghost btn-sm"
-                style={{ textDecoration: 'none' }}
-              >
-                전체보기 →
+              <Link href={`/admin/${site.slug}/reservations`} className="btn btn-ghost btn-sm">
+                전체보기
               </Link>
             </div>
             {todayReservations.length === 0 ? (
-              <div className="c-empty" style={{ padding: 'var(--sp-xl)' }}>
+              <div className="c-empty">
                 <div className="c-empty-icon">📭</div>
                 <div className="c-empty-text">오늘 예약이 없습니다.</div>
               </div>
@@ -284,7 +254,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                 <table className="c-table">
                   <thead>
                     <tr>
-                      <th style={{ width: 80 }}>시간</th>
+                      <th style={{ width: 90 }}>시간</th>
                       <th>고객명</th>
                       <th>시술</th>
                       <th style={{ textAlign: 'right' }}>상태</th>
@@ -293,12 +263,12 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                   <tbody>
                     {todayReservations.map((r) => (
                       <tr key={r.id}>
-                        <td style={{ fontWeight: 600, color: 'var(--accent)' }}>
+                        <td style={{ fontWeight: 700, color: 'var(--accent)' }}>
                           {(r.reservedTime as unknown as string)?.slice(0, 5) || '—'}
                         </td>
-                        <td style={{ fontWeight: 'var(--fw-semi)' }}>
-                          {r.customerName}
-                          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 400 }}>
+                        <td>
+                          <div style={{ fontWeight: 'var(--fw-semi)' }}>{r.customerName}</div>
+                          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
                             {r.customerPhone}
                           </div>
                         </td>
@@ -306,9 +276,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                           {r.treatmentName || '—'}
                         </td>
                         <td style={{ textAlign: 'right' }}>
-                          <span
-                            className={`c-badge ${STATUS_BADGE[r.status] || 'c-badge-gray'}`}
-                          >
+                          <span className={`c-badge ${STATUS_BADGE[r.status] || 'c-badge-gray'}`}>
                             {STATUS_LABEL[r.status] || r.status}
                           </span>
                         </td>
@@ -320,22 +288,22 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
             )}
           </div>
 
-          {/* 다가오는 예약 (7일) */}
-          <div className="card" style={{ border: '1px solid var(--border)', padding: 20 }}>
-            <div
-              className="card-header"
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-            >
+          {/* 다가오는 예약 */}
+          <div className="card">
+            <div className="card-header">
               <div>
-                <div className="card-title">🗓 다가오는 예약 (7일)</div>
+                <div className="card-title">
+                  <span className="material-symbols-rounded" style={{ verticalAlign: 'middle', marginRight: 6 }}>calendar_month</span>
+                  다가오는 예약 (7일)
+                </div>
                 <div className="card-subtitle">
-                  대기 {reservationsByStatus.pending}건 · 확정 {reservationsByStatus.confirmed}건
+                  대기 {pendingCount}건 · 확정 {confirmedCount}건
                 </div>
               </div>
             </div>
             {upcomingReservations.length === 0 ? (
-              <div className="c-empty" style={{ padding: 'var(--sp-xl)' }}>
-                <div className="c-empty-icon">📅</div>
+              <div className="c-empty">
+                <div className="c-empty-icon">🗓</div>
                 <div className="c-empty-text">다가오는 예약이 없습니다.</div>
               </div>
             ) : (
@@ -343,8 +311,8 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                 <table className="c-table">
                   <thead>
                     <tr>
-                      <th style={{ width: 110 }}>날짜</th>
-                      <th style={{ width: 70 }}>시간</th>
+                      <th style={{ width: 120 }}>날짜</th>
+                      <th style={{ width: 80 }}>시간</th>
                       <th>고객명</th>
                       <th>시술</th>
                       <th style={{ textAlign: 'right' }}>상태</th>
@@ -367,9 +335,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                           {r.treatmentName || '—'}
                         </td>
                         <td style={{ textAlign: 'right' }}>
-                          <span
-                            className={`c-badge ${STATUS_BADGE[r.status] || 'c-badge-gray'}`}
-                          >
+                          <span className={`c-badge ${STATUS_BADGE[r.status] || 'c-badge-gray'}`}>
                             {STATUS_LABEL[r.status] || r.status}
                           </span>
                         </td>
@@ -382,56 +348,55 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           </div>
         </div>
 
-        {/* 우측: 작업 + 워크보드 */}
+        {/* 우측 영역 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-lg)' }}>
           {/* 진행 중 작업 */}
-          <div className="card" style={{ border: '1px solid var(--border)', padding: 20 }}>
-            <div
-              className="card-header"
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-            >
+          <div className="card">
+            <div className="card-header">
               <div>
-                <div className="card-title">🔧 진행 중 작업</div>
+                <div className="card-title">
+                  <span className="material-symbols-rounded" style={{ verticalAlign: 'middle', marginRight: 6 }}>build</span>
+                  진행 중 작업
+                </div>
                 <div className="card-subtitle">최근 5건</div>
               </div>
-              <Link
-                href={`/admin/${slug}/work`}
-                className="btn btn-ghost btn-sm"
-                style={{ textDecoration: 'none' }}
-              >
-                전체보기 →
+              <Link href={`/admin/${site.slug}/work`} className="btn btn-ghost btn-sm">
+                전체보기
               </Link>
             </div>
             {pendingWork.length === 0 ? (
-              <div
-                style={{ padding: 'var(--sp-lg)', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}
-              >
-                진행 중인 작업이 없습니다.
+              <div className="c-empty">
+                <div className="c-empty-text">진행 중인 작업이 없습니다.</div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {pendingWork.map((w) => (
                   <div
                     key={w.id}
-                    style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 6 }}
+                    style={{
+                      padding: 'var(--sp-md)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-md)',
+                    }}
                   >
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 8,
-                        marginBottom: 4,
-                      }}
-                    >
-                      <div style={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+                      <div
+                        style={{
+                          fontSize: 'var(--fs-sm)',
+                          fontWeight: 'var(--fw-semi)',
+                          flex: 1,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         {w.title}
                       </div>
                       <span className={`c-badge ${WORK_STATUS_BADGE[w.status] || 'c-badge-gray'}`}>
                         {WORK_STATUS_LABEL[w.status] || w.status}
                       </span>
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                    <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
                       {new Date(w.createdAt).toLocaleDateString('ko-KR')}
                     </div>
                   </div>
@@ -440,45 +405,41 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
             )}
           </div>
 
-          {/* 워크보드 최근 소식 */}
-          <div className="card" style={{ border: '1px solid var(--border)', padding: 20 }}>
-            <div
-              className="card-header"
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-            >
+          {/* 워크보드 소식 */}
+          <div className="card">
+            <div className="card-header">
               <div>
-                <div className="card-title">📢 워크보드 소식</div>
-                <div className="card-subtitle">
-                  {myWb[0]?.wbName ?? '파트너 공유 보드'}
+                <div className="card-title">
+                  <span className="material-symbols-rounded" style={{ verticalAlign: 'middle', marginRight: 6 }}>forum</span>
+                  워크보드 소식
                 </div>
+                <div className="card-subtitle">{myWb[0]?.wbName ?? '파트너 공유 보드'}</div>
               </div>
               {myWb.length > 0 && (
-                <Link
-                  href={`/admin/${slug}/workboard`}
-                  className="btn btn-ghost btn-sm"
-                  style={{ textDecoration: 'none' }}
-                >
-                  전체보기 →
+                <Link href={`/admin/${site.slug}/workboard`} className="btn btn-ghost btn-sm">
+                  전체보기
                 </Link>
               )}
             </div>
             {recentPosts.length === 0 ? (
-              <div
-                style={{ padding: 'var(--sp-lg)', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}
-              >
-                최근 게시물이 없습니다.
+              <div className="c-empty">
+                <div className="c-empty-text">최근 게시물이 없습니다.</div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {recentPosts.map((p) => (
                   <div
                     key={p.id}
-                    style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 6 }}
+                    style={{
+                      padding: 'var(--sp-md)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-md)',
+                    }}
                   >
                     <div
                       style={{
-                        fontSize: 13,
-                        fontWeight: 600,
+                        fontSize: 'var(--fs-sm)',
+                        fontWeight: 'var(--fw-semi)',
                         marginBottom: 4,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -487,7 +448,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                     >
                       {p.title}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                    <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
                       {p.boardName} · {p.authorName ?? '파트너'} ·{' '}
                       {new Date(p.createdAt).toLocaleDateString('ko-KR')}
                     </div>
@@ -498,6 +459,6 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

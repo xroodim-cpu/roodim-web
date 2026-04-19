@@ -53,7 +53,7 @@ function formatDate(iso: string): string {
 
 function formatTime(t: string | null): string {
   if (!t) return '';
-  return t.slice(0, 5); // HH:MM
+  return t.slice(0, 5);
 }
 
 export default function AddressBookClient({ charts }: Props) {
@@ -79,27 +79,24 @@ export default function AddressBookClient({ charts }: Props) {
   );
 
   return (
-    <div>
-      <div style={{ marginBottom: 20 }}>
-        <h1 className="c-page-title">주소록</h1>
-        <p className="c-page-subtitle">
-          예약 고객 차트 — 홈페이지에서 예약한 고객의 방문 이력·메모를 한눈에.
-        </p>
+    <>
+      <div className="c-page-header">
+        <div>
+          <h1 className="c-page-title">주소록</h1>
+          <p className="c-page-subtitle">
+            예약 고객 차트 — 홈페이지에서 예약한 고객의 방문 이력·메모를 한눈에.
+          </p>
+        </div>
       </div>
 
       {charts.length === 0 ? (
-        <div
-          className="card"
-          style={{ padding: 'var(--sp-3xl)', textAlign: 'center' }}
-        >
-          <div style={{ fontSize: 48, marginBottom: 12 }}>📇</div>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>
-            등록된 고객이 없습니다
-          </div>
-          <div
-            style={{ fontSize: 13, color: 'var(--text-tertiary)' }}
-          >
-            홈페이지 예약 기능을 통해 예약이 들어오면 자동으로 주소록에 등록됩니다.
+        <div className="card">
+          <div className="c-empty">
+            <div className="c-empty-icon">📇</div>
+            <div className="c-empty-text">등록된 고객이 없습니다</div>
+            <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-tertiary)', marginTop: 6 }}>
+              홈페이지 예약 기능을 통해 예약이 들어오면 자동으로 주소록에 등록됩니다.
+            </p>
           </div>
         </div>
       ) : (
@@ -112,28 +109,40 @@ export default function AddressBookClient({ charts }: Props) {
           }}
         >
           {/* 좌측: 고객 리스트 */}
-          <div
-            className="card"
-            style={{ padding: 0, overflow: 'hidden' }}
-          >
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             <div
               style={{
                 padding: 'var(--sp-md)',
                 borderBottom: '1px solid var(--border)',
               }}
             >
-              <input
-                type="text"
-                className="c-input"
-                placeholder="이름·전화·이메일 검색"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                style={{ width: '100%' }}
-              />
+              <div style={{ position: 'relative' }}>
+                <span
+                  className="material-symbols-rounded"
+                  style={{
+                    position: 'absolute',
+                    left: 10,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    fontSize: 18,
+                    color: 'var(--text-tertiary)',
+                  }}
+                >
+                  search
+                </span>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="이름·전화·이메일 검색"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  style={{ width: '100%', paddingLeft: 34 }}
+                />
+              </div>
               <div
                 style={{
                   marginTop: 8,
-                  fontSize: 12,
+                  fontSize: 'var(--fs-xs)',
                   color: 'var(--text-tertiary)',
                 }}
               >
@@ -142,7 +151,7 @@ export default function AddressBookClient({ charts }: Props) {
             </div>
             <div
               style={{
-                maxHeight: 'calc(100vh - 260px)',
+                maxHeight: 'calc(100vh - 280px)',
                 overflowY: 'auto',
               }}
             >
@@ -153,6 +162,7 @@ export default function AddressBookClient({ charts }: Props) {
                     key={c.phone}
                     type="button"
                     onClick={() => setSelectedPhone(c.phone)}
+                    className={isActive ? 'ab-row active' : 'ab-row'}
                     style={{
                       display: 'block',
                       width: '100%',
@@ -169,8 +179,8 @@ export default function AddressBookClient({ charts }: Props) {
                   >
                     <div
                       style={{
-                        fontSize: 14,
-                        fontWeight: 600,
+                        fontSize: 'var(--fs-sm)',
+                        fontWeight: 'var(--fw-semi)',
                         color: 'var(--text-primary)',
                         marginBottom: 4,
                       }}
@@ -179,105 +189,64 @@ export default function AddressBookClient({ charts }: Props) {
                     </div>
                     <div
                       style={{
-                        fontSize: 12,
+                        fontSize: 'var(--fs-xs)',
                         color: 'var(--text-tertiary)',
                         marginBottom: 6,
                       }}
                     >
                       {c.phone}
                     </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontSize: 11,
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      <span
-                        style={{
-                          padding: '2px 6px',
-                          background: 'var(--bg-tertiary)',
-                          borderRadius: 3,
-                          fontWeight: 600,
-                        }}
-                      >
-                        방문 {c.visitCount}회
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className="c-badge c-badge-gray">방문 {c.visitCount}회</span>
+                      <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>
+                        최근 {formatDate(c.lastVisit)}
                       </span>
-                      <span>최근 {formatDate(c.lastVisit)}</span>
                     </div>
                   </button>
                 );
               })}
               {filtered.length === 0 && (
-                <div
-                  style={{
-                    padding: 'var(--sp-xl)',
-                    textAlign: 'center',
-                    color: 'var(--text-tertiary)',
-                    fontSize: 13,
-                  }}
-                >
-                  검색 결과가 없습니다.
+                <div className="c-empty">
+                  <div className="c-empty-text">검색 결과가 없습니다.</div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* 우측: 선택된 고객의 차트 */}
+          {/* 우측: 선택 고객의 차트 */}
           {selected ? (
-            <div className="card" style={{ padding: 'var(--sp-xl)' }}>
+            <div className="card">
               <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  justifyContent: 'space-between',
-                  gap: 16,
-                  marginBottom: 'var(--sp-lg)',
-                  paddingBottom: 'var(--sp-md)',
-                  borderBottom: '1px solid var(--border)',
-                }}
+                className="card-header"
+                style={{ alignItems: 'flex-start' }}
               >
                 <div>
-                  <div
-                    style={{
-                      fontSize: 22,
-                      fontWeight: 700,
-                      marginBottom: 6,
-                    }}
-                  >
-                    {selected.name}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: 'var(--text-secondary)',
-                      display: 'flex',
-                      gap: 12,
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    <span>📞 {selected.phone}</span>
-                    {selected.email && <span>✉ {selected.email}</span>}
+                  <div className="card-title">{selected.name}</div>
+                  <div className="card-subtitle" style={{ marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    <span>
+                      <span className="material-symbols-rounded" style={{ verticalAlign: 'middle', fontSize: 16, marginRight: 4 }}>call</span>
+                      {selected.phone}
+                    </span>
+                    {selected.email && (
+                      <span>
+                        <span className="material-symbols-rounded" style={{ verticalAlign: 'middle', fontSize: 16, marginRight: 4 }}>mail</span>
+                        {selected.email}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div
                     style={{
-                      fontSize: 24,
-                      fontWeight: 700,
+                      fontSize: 'var(--fs-2xl)',
+                      fontWeight: 'var(--fw-black)',
                       color: 'var(--accent)',
+                      lineHeight: 1,
                     }}
                   >
                     {selected.visitCount}
                   </div>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: 'var(--text-tertiary)',
-                    }}
-                  >
+                  <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
                     총 방문
                   </div>
                 </div>
@@ -287,7 +256,7 @@ export default function AddressBookClient({ charts }: Props) {
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '1fr 1fr',
-                  gap: 12,
+                  gap: 'var(--sp-md)',
                   marginBottom: 'var(--sp-lg)',
                 }}
               >
@@ -295,19 +264,13 @@ export default function AddressBookClient({ charts }: Props) {
                   style={{
                     padding: 'var(--sp-md)',
                     background: 'var(--bg-secondary)',
-                    borderRadius: 6,
+                    borderRadius: 'var(--radius-md)',
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: 'var(--text-tertiary)',
-                      marginBottom: 4,
-                    }}
-                  >
+                  <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)', marginBottom: 4 }}>
                     첫 방문
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>
+                  <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 'var(--fw-semi)' }}>
                     {formatDate(selected.firstVisit)}
                   </div>
                 </div>
@@ -315,19 +278,13 @@ export default function AddressBookClient({ charts }: Props) {
                   style={{
                     padding: 'var(--sp-md)',
                     background: 'var(--bg-secondary)',
-                    borderRadius: 6,
+                    borderRadius: 'var(--radius-md)',
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: 'var(--text-tertiary)',
-                      marginBottom: 4,
-                    }}
-                  >
+                  <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)', marginBottom: 4 }}>
                     최근 방문
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>
+                  <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 'var(--fw-semi)' }}>
                     {formatDate(selected.lastVisit)}
                   </div>
                 </div>
@@ -335,71 +292,55 @@ export default function AddressBookClient({ charts }: Props) {
 
               <div
                 style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  marginBottom: 'var(--sp-sm)',
+                  fontSize: 'var(--fs-sm)',
+                  fontWeight: 'var(--fw-semi)',
                   color: 'var(--text-secondary)',
+                  marginBottom: 'var(--sp-sm)',
                 }}
               >
                 방문 이력
               </div>
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
-                }}
-              >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {selected.reservations.map((r) => (
                   <div
                     key={r.id}
                     style={{
                       padding: 'var(--sp-md)',
                       border: '1px solid var(--border)',
-                      borderRadius: 6,
+                      borderRadius: 'var(--radius-md)',
                     }}
                   >
                     <div
                       style={{
                         display: 'flex',
-                        alignItems: 'center',
                         justifyContent: 'space-between',
                         marginBottom: 6,
                         flexWrap: 'wrap',
                         gap: 8,
                       }}
                     >
-                      <div
-                        style={{
-                          fontSize: 14,
-                          fontWeight: 600,
-                        }}
-                      >
+                      <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 'var(--fw-semi)' }}>
                         {formatDate(r.date)}
                         {r.time && (
                           <span
                             style={{
                               marginLeft: 8,
                               color: 'var(--text-tertiary)',
-                              fontWeight: 400,
+                              fontWeight: 'var(--fw-normal)',
                             }}
                           >
                             {formatTime(r.time)}
                           </span>
                         )}
                       </div>
-                      <span
-                        className={`c-badge ${
-                          STATUS_BADGE[r.status] || 'c-badge-gray'
-                        }`}
-                      >
+                      <span className={`c-badge ${STATUS_BADGE[r.status] || 'c-badge-gray'}`}>
                         {STATUS_LABEL[r.status] || r.status}
                       </span>
                     </div>
                     {r.treatment && (
                       <div
                         style={{
-                          fontSize: 13,
+                          fontSize: 'var(--fs-sm)',
                           color: 'var(--text-secondary)',
                           marginBottom: 4,
                         }}
@@ -410,12 +351,12 @@ export default function AddressBookClient({ charts }: Props) {
                     {r.memo && (
                       <div
                         style={{
-                          fontSize: 12,
+                          fontSize: 'var(--fs-xs)',
                           color: 'var(--text-tertiary)',
                           marginTop: 6,
                           padding: 8,
                           background: 'var(--bg-secondary)',
-                          borderRadius: 4,
+                          borderRadius: 'var(--radius-sm)',
                         }}
                       >
                         <strong>고객 메모:</strong> {r.memo}
@@ -424,12 +365,12 @@ export default function AddressBookClient({ charts }: Props) {
                     {r.adminMemo && (
                       <div
                         style={{
-                          fontSize: 12,
+                          fontSize: 'var(--fs-xs)',
                           color: 'var(--text-tertiary)',
                           marginTop: 6,
                           padding: 8,
                           background: '#fffbeb',
-                          borderRadius: 4,
+                          borderRadius: 'var(--radius-sm)',
                           borderLeft: '3px solid #fbbf24',
                         }}
                       >
@@ -441,14 +382,14 @@ export default function AddressBookClient({ charts }: Props) {
               </div>
             </div>
           ) : (
-            <div className="card" style={{ padding: 'var(--sp-xl)' }}>
-              <div style={{ textAlign: 'center', color: 'var(--text-tertiary)' }}>
-                좌측에서 고객을 선택하세요.
+            <div className="card">
+              <div className="c-empty">
+                <div className="c-empty-text">좌측에서 고객을 선택하세요.</div>
               </div>
             </div>
           )}
         </div>
       )}
-    </div>
+    </>
   );
 }
