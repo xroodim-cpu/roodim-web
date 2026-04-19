@@ -15,13 +15,33 @@ export async function generateMetadata({ params }: PageProps) {
   const configs = await getAllSiteConfigs(site.id);
   const seo = configs['seo'] || {};
   const base = configs['base'] || {};
+
+  const title = (seo.meta_title as string) || (seo.title as string) || (base.site_name as string) || site.name;
+  const description = (seo.meta_description as string) || (seo.description as string) || (base.tagline as string) || '';
+  const keywords = (seo.meta_keywords as string) || (seo.keywords as string) || '';
+  const ogImage = (seo.og_image as string) || '';
+  const favicon = (seo.favicon_url as string) || (base.favicon_url as string) || '';
+  const robotsVal = (seo.robots as string) || 'index, follow';
+
+  // "index, follow" → { index: true, follow: true } 파싱
+  const parseRobots = (r: string) => {
+    const parts = r.toLowerCase().split(',').map((p) => p.trim());
+    return {
+      index: !parts.includes('noindex'),
+      follow: !parts.includes('nofollow'),
+    };
+  };
+
   return {
-    title: (seo.meta_title as string) || (base.site_name as string) || site.name,
-    description: (seo.meta_description as string) || (base.tagline as string) || '',
+    title,
+    description,
+    ...(keywords ? { keywords } : {}),
+    robots: parseRobots(robotsVal),
+    ...(favicon ? { icons: { icon: favicon } } : {}),
     openGraph: {
-      title: (seo.meta_title as string) || site.name,
-      description: (seo.meta_description as string) || '',
-      images: seo.og_image ? [{ url: seo.og_image as string }] : [],
+      title,
+      description,
+      images: ogImage ? [{ url: ogImage }] : [],
     },
   };
 }
