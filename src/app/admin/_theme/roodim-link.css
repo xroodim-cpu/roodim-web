@@ -1634,13 +1634,37 @@ img.avatar,
  * Next.js 리액트 컴포넌트 특성상 반복되는 패턴을 유틸화.
  */
 
-/* ===== body 토큰 활성화 (admin 영역 진입 시) ===== */
+/* ===== body 토큰 활성화 (admin 영역 진입 시) =====
+ * 사용자 피드백: 루딤링크 대비 글자가 작아 보임 → 전 토큰 한 단계 up.
+ * 루딤링크 Laravel 원본은 14/15/16/17/18/20/24/28 이지만 루딤웹은 여백이 더 넓고
+ * 사이드바 유무 차이가 있어 시각적으로 작게 느껴짐. admin scope 에서만 재정의.
+ */
 body.roodim-admin {
+  --fs-xs:   15px;  /* was 14 */
+  --fs-sm:   16px;  /* was 15 */
+  --fs-base: 17px;  /* was 16 */
+  --fs-md:   18px;  /* was 17 */
+  --fs-lg:   20px;  /* was 18 */
+  --fs-xl:   22px;  /* was 20 */
+  --fs-2xl:  26px;  /* was 24 */
+  --fs-3xl:  32px;  /* was 28 */
+
   background: var(--bg-primary, #f8f6f5);
   font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
     system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', sans-serif;
   color: var(--text-primary, #1f1f1f);
-  font-size: var(--fs-base, 14px);
+  font-size: var(--fs-base);
+  line-height: 1.55;
+}
+
+/* wb-main 을 넓은 뷰포트에서 과하게 퍼지지 않게 중앙 정렬
+ * (루딤링크 /boards 는 좌측 사이드바 250px 때문에 자연스럽게 컴팩트했지만
+ *  루딤웹 admin 은 서브메뉴 없는 페이지에서 너무 spread 됨) */
+body.roodim-admin .wb-main {
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
 }
 
 /* ===== 페이지 공통 ===== */
