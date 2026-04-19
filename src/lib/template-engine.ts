@@ -166,6 +166,7 @@ export async function renderSiteFile(
   const metaTitle = seoConfig.meta_title || baseConfig.site_name || baseConfig.title || '';
   const metaDesc = seoConfig.meta_description || baseConfig.description || '';
   const metaKeywords = seoConfig.meta_keywords || '';
+  const robotsVal = (seoConfig.robots || 'index, follow').trim();
   const ogTitle = seoConfig.og_title || metaTitle;
   const ogDesc = seoConfig.og_description || metaDesc;
   const ogImage = resolveAssetUrl(seoConfig.og_image || '');
@@ -179,6 +180,10 @@ export async function renderSiteFile(
   }
   if (metaKeywords && !/<meta[^>]*name=["']keywords/i.test(html)) {
     headInjection += `\n    <meta name="keywords" content="${metaKeywords}">`;
+  }
+  // robots: 검색엔진 크롤링/색인 허용 여부. 기본 'index, follow' 이므로 항상 주입.
+  if (!/<meta[^>]*name=["']robots/i.test(html)) {
+    headInjection += `\n    <meta name="robots" content="${robotsVal}">`;
   }
   if (ogTitle && !/<meta[^>]*property=["']og:title/i.test(html)) {
     headInjection += `\n    <meta property="og:title" content="${ogTitle}">`;
