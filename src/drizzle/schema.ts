@@ -4,7 +4,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 // ===== Enums =====
-export const siteStatusEnum = pgEnum('site_status', ['draft', 'active', 'maintenance']);
+export const siteStatusEnum = pgEnum('site_status', ['draft', 'active', 'maintenance', 'suspended']);
 export const reservationStatusEnum = pgEnum('reservation_status', ['pending', 'confirmed', 'cancelled', 'completed']);
 export const maintenancePriorityEnum = pgEnum('maintenance_priority', ['low', 'normal', 'high', 'urgent']);
 export const maintenanceStatusEnum = pgEnum('maintenance_status', ['pending', 'reviewing', 'working', 'done', 'cancelled']);
@@ -12,7 +12,7 @@ export const syncStatusEnum = pgEnum('sync_status', ['pending', 'synced', 'faile
 export const adminRoleEnum = pgEnum('admin_role', ['owner', 'editor']);
 
 // ===== site_type enum =====
-export const siteTypeEnum = pgEnum('site_type', ['standalone', 'rental', 'partner', 'creator']);
+export const siteTypeEnum = pgEnum('site_type', ['standalone', 'rental', 'partner', 'creator', 'customer']);
 
 // ===== sites =====
 export const sites = pgTable('sites', {
@@ -211,6 +211,7 @@ export const webSkins = pgTable('web_skins', {
   previewUrl: varchar('preview_url', { length: 500 }),
   version: varchar('version', { length: 20 }).default('1.0.0'),
   category: varchar('category', { length: 50 }),                 // beauty, clinic, cafe, general
+  targetType: varchar('target_type', { length: 20 }).default('member').notNull(), // member / customer
   isDefault: boolean('is_default').default(false),
   isFree: boolean('is_free').default(true),
   creatorId: integer('creator_id'),                              // Laravel members.id

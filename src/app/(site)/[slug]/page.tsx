@@ -30,7 +30,25 @@ export default async function SitePage({ params }: PageProps) {
   const { slug } = await params;
 
   const site = await getSiteBySlug(slug);
-  if (!site || site.status !== 'active') notFound();
+  if (!site) notFound();
+
+  // 웹서비스 구독 만료(30일 경과) → 사이트 차단
+  if (site.status === 'suspended') {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          </div>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">사이트 이용이 중단되었습니다</h1>
+          <p className="text-sm text-gray-600 leading-relaxed mb-4">웹서비스 구독이 만료되어 홈페이지가 차단되었습니다.<br />담당자에게 결제 확인을 요청해주세요.</p>
+          <p className="text-xs text-gray-400">문의: 루딤 고객센터</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (site.status !== 'active') notFound();
 
   // configs + sections 병렬
   const [configs, sections] = await Promise.all([

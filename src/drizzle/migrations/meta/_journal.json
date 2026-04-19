@@ -36,6 +36,34 @@
       "when": 1776595200000,
       "tag": "0004_board_post_reply",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776700000000,
+      "tag": "0005_workboard_customer_support",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776800000000,
+      "tag": "0006_workboard_site_nullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776572400000,
+      "tag": "0007_customer_site_and_skins",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1776572500000,
+      "tag": "0008_seed_customer_default_skin",
+      "breakpoints": true
     }
   ]
 }
