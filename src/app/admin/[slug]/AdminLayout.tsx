@@ -247,15 +247,15 @@ export default function AdminLayout({
               ))}
             </div>
           </aside>
-          <main className="wb-main">{children}</main>
+          <main className="wb-main" style={{ paddingTop: 24 }}>
+            {children}
+          </main>
         </div>
       ) : (
         <main
           className="wb-main"
           style={{
-            maxWidth: 'var(--content-max, 1280px)',
-            margin: '0 auto',
-            padding: 'var(--sp-xl) var(--sp-xl)',
+            paddingTop: 24,
             minHeight: 'calc(100vh - var(--header-height, 60px))',
           }}
         >
