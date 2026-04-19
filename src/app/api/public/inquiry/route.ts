@@ -53,9 +53,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Site not found' }, { status: 404 });
     }
 
-    // ── partner 사이트 → 루딤링크(Laravel) 게시판으로 전달 ──
-    if (site.siteType === 'partner' && site.adminOrganizationId) {
-      return handlePartnerInquiry(site, body);
+    // ── partner / creator (회원 사이트) → 루딤링크(Laravel) 게시판으로 전달 ──
+    // 커밋 7f029979 정책: 회원사이트(member) → 루딤 마스터 / 고객사이트(customer) → 파트너 조직
+    // 라우팅은 Laravel 측 resolveTargetOrg 가 slug 기준으로 자동 결정
+    if ((site.siteType === 'partner' || site.siteType === 'creator') && site.adminOrganizationId) {
+      return handlePartnerInquiry(site, body, slug);
     }
 
     // 시스템 게시판 확보
@@ -188,69 +190,71 @@ function escapeHtml(str: string): string {
 }
 
 /**
- * partner 사이트 문의 → 루딤링크(Laravel) Bridge API 로 전달.
- * 회원은 루딤웹 어드민에 접근 못하므로, 루딤링크 게시판에 저장해야 함.
+ * partner / creator 사이트 문의 → 루딤링크(Laravel) API 로 전달.
+ * 회원 조직 사용자는 루딤웹 어드민에 접근하지 않으므로 루딤링크 게시판에 저장해야 함.
+ * Laravel `/api/sites/{slug}/bulletins/inquiry/submit` 는 slug 로 target org 를 resolve:
+ *  - 회원사이트(partner/creator) → 루딤 마스터 bulletin
+ *  - 고객사이트(customer) → 파트너 조직 bulletin
  */
 async function handlePartnerInquiry(
   site: { adminOrganizationId: number | null },
   body: Record<string, unknown>,
+  slug: string,
 ): Promise<NextResponse> {
-  const orgId = site.adminOrganizationId!;
   const { fields, content, mode } = body;
 
   const useUnified = mode === 'unified' || (typeof content === 'string' && String(content).trim().length > 0);
   const hasFields = fields && typeof fields === 'object' && Object.keys(fields as object).length > 0;
 
-  let finalContent: string;
-  let authorName = '방문자';
-  let authorPhone: string | null = null;
-  let authorEmail: string | null = null;
-  let finalTitle: string;
-
-  if (useUnified) {
-    finalContent = String(content).trim();
-    const textOnly = stripHtml(finalContent);
-    authorName = extractFromText(textOnly, ['성함', '이름', '담당자', '성명', 'name']) || '방문자';
-    authorPhone = extractFromText(textOnly, ['연락처', '전화', '핸드폰', '휴대폰', '전화번호', 'phone']);
-    authorEmail = extractFromText(textOnly, ['이메일', 'email', 'e-mail']);
-    const companyName = extractFromText(textOnly, ['병원명', '회사명', '업체명', '상호', 'company']);
-    const titleSeed = [companyName, authorName].filter(Boolean).join(' / ');
-    finalTitle = titleSeed ? `문의 — ${titleSeed}` : `상담 요청 — ${new Date().toLocaleString('ko-KR')}`;
-  } else if (hasFields) {
-    const fieldEntries = Object.entries(fields as Record<string, string>);
-    authorName = extractField(fieldEntries, ['성함', '이름', '담당자', 'name', '성명']) || '방문자';
-    authorPhone = extractField(fieldEntries, ['연락처', '전화', '핸드폰', '휴대폰', 'phone', '전화번호']);
-    authorEmail = extractField(fieldEntries, ['이메일', 'email', 'e-mail']);
-    const companyName = extractField(fieldEntries, ['병원명', '회사명', '업체명', '상호', 'company']);
-    const titleParts = [companyName, authorName].filter(Boolean);
-    finalTitle = `문의 — ${titleParts.join(' / ') || '익명'}`;
-    finalContent = fieldEntries
-      .map(([key, val]) => `<p><strong>${escapeHtml(key)}</strong> : ${escapeHtml(String(val))}</p>`)
-      .join('\n');
-  } else {
+  if (!useUnified && !hasFields) {
     return NextResponse.json(
       { error: 'content(unified) 또는 fields 중 하나는 필수입니다.' },
       { status: 400 },
     );
   }
 
-  const result = await adminApi<{ ok: boolean; post_id?: number }>('POST', '/api/bridge/bulletins/inquiry/submit', {
-    org_id: orgId,
-    title: finalTitle,
-    content: finalContent,
-    author_name: authorName,
-    author_phone: authorPhone,
-    author_email: authorEmail,
-  });
+  // Laravel 은 fields 우선, 없으면 content 로 저장하도록 완화됨.
+  // fields 가 있으면 그대로 전달. 없으면 unified content 에서 간이 fields 재구성.
+  let payloadFields: Record<string, string> | undefined;
+  if (hasFields) {
+    payloadFields = fields as Record<string, string>;
+  } else if (useUnified) {
+    // unified content → `<p><strong>라벨</strong>: 값</p>` 패턴에서 fields 객체 복원
+    payloadFields = parseUnifiedToFields(String(content));
+  }
+
+  const result = await adminApi<{ ok: boolean; post_id?: number; message?: string }>(
+    'POST',
+    `/api/sites/${encodeURIComponent(slug)}/bulletins/inquiry/submit`,
+    payloadFields && Object.keys(payloadFields).length > 0
+      ? { fields: payloadFields }
+      : { content: String(content ?? ''), mode: 'unified' },
+  );
 
   if (!result.ok) {
-    console.error('[POST /api/public/inquiry] Laravel bridge error:', result.error);
-    return NextResponse.json({ error: '문의 접수 중 오류가 발생했습니다.' }, { status: 500 });
+    console.error('[POST /api/public/inquiry] Laravel inquiry submit error:', result.error);
+    return NextResponse.json(
+      { error: result.error || '문의 접수 중 오류가 발생했습니다.' },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({
     ok: true,
-    message: '문의가 접수되었습니다.',
+    message: result.data?.message || '문의가 접수되었습니다.',
     postId: result.data?.post_id,
   });
+}
+
+/** unified HTML (`<p><strong>라벨</strong>: 값</p>`...) 에서 { 라벨: 값 } 객체 복원 */
+function parseUnifiedToFields(html: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const re = /<strong>\s*([^<]+?)\s*<\/strong>\s*[:：]\s*([^<]+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const key = m[1].trim();
+    const val = m[2].trim();
+    if (key && val) out[key] = val;
+  }
+  return out;
 }

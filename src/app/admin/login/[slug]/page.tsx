@@ -111,17 +111,17 @@ export default function SiteLoginPage() {
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label htmlFor="email" className="form-label">
-                이메일
+                로그인 ID
               </label>
               <input
                 id="email"
-                type="email"
+                type="text"
                 className="form-input"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@example.com"
+                placeholder="예: vuclinic 또는 admin@example.com"
                 required
-                autoComplete="email"
+                autoComplete="username"
                 autoFocus
               />
             </div>
