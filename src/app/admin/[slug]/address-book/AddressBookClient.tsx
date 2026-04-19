@@ -90,7 +90,7 @@ export default function AddressBookClient({ charts }: Props) {
       </div>
 
       {charts.length === 0 ? (
-        <div className="card" style={{ padding: 20 }}>
+        <div className="card" style={{ padding: 20, border: '1px solid var(--border)' }}>
           <div className="c-empty">
             <div className="c-empty-icon">📇</div>
             <div className="c-empty-text">등록된 고객이 없습니다</div>
@@ -215,7 +215,7 @@ export default function AddressBookClient({ charts }: Props) {
 
           {/* 우측: 선택 고객의 차트 */}
           {selected ? (
-            <div className="card" style={{ padding: 20 }}>
+            <div className="card" style={{ padding: 20, border: '1px solid var(--border)' }}>
               <div
                 className="card-header"
                 style={{ alignItems: 'flex-start' }}
@@ -382,7 +382,7 @@ export default function AddressBookClient({ charts }: Props) {
               </div>
             </div>
           ) : (
-            <div className="card" style={{ padding: 20 }}>
+            <div className="card" style={{ padding: 20, border: '1px solid var(--border)' }}>
               <div className="c-empty">
                 <div className="c-empty-text">좌측에서 고객을 선택하세요.</div>
               </div>

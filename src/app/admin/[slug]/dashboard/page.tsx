@@ -229,7 +229,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-lg)' }}>
           {/* 오늘의 예약 */}
-          <div className="card" style={{ padding: 20 }}>
+          <div className="card" style={{ padding: 20, border: '1px solid var(--border)' }}>
             <div className="card-header">
               <div>
                 <div className="card-title">
@@ -289,7 +289,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           </div>
 
           {/* 다가오는 예약 */}
-          <div className="card" style={{ padding: 20 }}>
+          <div className="card" style={{ padding: 20, border: '1px solid var(--border)' }}>
             <div className="card-header">
               <div>
                 <div className="card-title">
@@ -351,7 +351,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
         {/* 우측 영역 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-lg)' }}>
           {/* 진행 중 작업 */}
-          <div className="card" style={{ padding: 20 }}>
+          <div className="card" style={{ padding: 20, border: '1px solid var(--border)' }}>
             <div className="card-header">
               <div>
                 <div className="card-title">
@@ -406,7 +406,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           </div>
 
           {/* 워크보드 소식 */}
-          <div className="card" style={{ padding: 20 }}>
+          <div className="card" style={{ padding: 20, border: '1px solid var(--border)' }}>
             <div className="card-header">
               <div>
                 <div className="card-title">
