@@ -105,15 +105,17 @@ export default function AdminLayout({
       {/* ===== 상단 네비게이션 — 루딤링크 app.blade 구조 그대로 ===== */}
       <nav className="topnav">
         <div className="topnav-inner">
-          {/* 모바일 좌측 토글 */}
-          <button
-            className="topnav-side-toggle"
-            type="button"
-            onClick={() => setSideOpen((v) => !v)}
-            aria-label="메뉴"
-          >
-            <span className="material-symbols-rounded">menu</span>
-          </button>
+          {/* 모바일 좌측 토글 — 서브메뉴(wb-side)가 있는 페이지에서만 노출 */}
+          {hasSubMenus && (
+            <button
+              className="topnav-side-toggle"
+              type="button"
+              onClick={() => setSideOpen((v) => !v)}
+              aria-label="메뉴"
+            >
+              <span className="material-symbols-rounded">menu</span>
+            </button>
+          )}
 
           {/* 브랜드 로고 + 사이트명 */}
           <Link href={`/admin/${slug}/dashboard`} className="topnav-brand">
