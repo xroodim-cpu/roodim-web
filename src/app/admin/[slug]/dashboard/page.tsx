@@ -67,15 +67,11 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayStr = toDateStr(today);
-
   const weekLater = new Date(today);
   weekLater.setDate(weekLater.getDate() + 7);
   const weekLaterStr = toDateStr(weekLater);
-
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const monthStartStr = toDateStr(monthStart);
   const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-  const monthEndStr = toDateStr(monthEnd);
 
   const todayReservations = await db
     .select()
@@ -107,8 +103,8 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
     .where(
       and(
         eq(reservations.siteId, site.id),
-        gte(reservations.reservedDate, monthStartStr),
-        lt(reservations.reservedDate, monthEndStr),
+        gte(reservations.reservedDate, toDateStr(monthStart)),
+        lt(reservations.reservedDate, toDateStr(monthEnd)),
       ),
     );
 
@@ -139,10 +135,7 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
     boardName: string;
   }> = [];
   if (myWb.length > 0) {
-    const boardRows = await db
-      .select()
-      .from(boards)
-      .where(eq(boards.siteId, site.id));
+    const boardRows = await db.select().from(boards).where(eq(boards.siteId, site.id));
     const boardIds = boardRows.map((b) => b.id);
     if (boardIds.length > 0) {
       const posts = await db
@@ -173,42 +166,31 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
         </div>
       </div>
 
-      {/* 상단 통계 카드 4개 — 루딤링크 .stats-grid / .stat-card 구조 */}
+      {/* 상단 통계 카드 4개 */}
       <div className="stats-grid">
         <Link href={`/admin/${site.slug}/reservations`} className="stat-card">
-          <div className="stat-icon red">
-            <span className="material-symbols-rounded">event</span>
-          </div>
+          <div className="stat-icon red"><span className="material-symbols-rounded">event</span></div>
           <div className="stat-info">
             <div className="stat-value">{todayReservations.length}</div>
             <div className="stat-label">오늘 예약</div>
           </div>
         </Link>
-
         <Link href={`/admin/${site.slug}/reservations`} className="stat-card">
-          <div className="stat-icon blue">
-            <span className="material-symbols-rounded">calendar_month</span>
-          </div>
+          <div className="stat-icon blue"><span className="material-symbols-rounded">calendar_month</span></div>
           <div className="stat-info">
             <div className="stat-value">{upcomingReservations.length}</div>
             <div className="stat-label">이번 주 예약</div>
           </div>
         </Link>
-
         <Link href={`/admin/${site.slug}/reservations`} className="stat-card">
-          <div className="stat-icon green">
-            <span className="material-symbols-rounded">bar_chart</span>
-          </div>
+          <div className="stat-icon green"><span className="material-symbols-rounded">bar_chart</span></div>
           <div className="stat-info">
             <div className="stat-value">{monthReservations.length}</div>
             <div className="stat-label">이번 달 예약</div>
           </div>
         </Link>
-
         <Link href={`/admin/${site.slug}/work`} className="stat-card">
-          <div className="stat-icon yellow">
-            <span className="material-symbols-rounded">build</span>
-          </div>
+          <div className="stat-icon yellow"><span className="material-symbols-rounded">build</span></div>
           <div className="stat-info">
             <div className="stat-value">{pendingWork.length}</div>
             <div className="stat-label">진행 중 작업</div>
@@ -216,25 +198,15 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
         </Link>
       </div>
 
-      {/* 메인 그리드: 좌(예약 큰 카드) + 우(작업·워크보드) */}
-      <div
-        className="c-grid"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.8fr) minmax(0, 1fr)',
-          gap: 'var(--sp-lg)',
-          alignItems: 'start',
-          marginTop: 'var(--sp-xl)',
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-lg)' }}>
+      {/* 메인 그리드: 좌(예약) + 우(작업·워크보드) */}
+      <div className="admin-2col">
+        <div className="admin-stack">
           {/* 오늘의 예약 */}
-          <div className="card" style={{ padding: 20, border: '1px solid var(--border)' }}>
+          <div className="admin-card">
             <div className="card-header">
               <div>
                 <div className="card-title">
-                  <span className="material-symbols-rounded" style={{ verticalAlign: 'middle', marginRight: 6, color: 'var(--accent)' }}>event</span>
-                  오늘의 예약
+                  <span className="material-symbols-rounded">event</span>오늘의 예약
                 </div>
                 <div className="card-subtitle">
                   {today.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' })}
@@ -254,28 +226,26 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                 <table className="c-table">
                   <thead>
                     <tr>
-                      <th style={{ width: 90 }}>시간</th>
+                      <th>시간</th>
                       <th>고객명</th>
                       <th>시술</th>
-                      <th style={{ textAlign: 'right' }}>상태</th>
+                      <th className="cell-right">상태</th>
                     </tr>
                   </thead>
                   <tbody>
                     {todayReservations.map((r) => (
                       <tr key={r.id}>
-                        <td style={{ fontWeight: 700, color: 'var(--accent)' }}>
+                        <td className="cell-accent">
                           {(r.reservedTime as unknown as string)?.slice(0, 5) || '—'}
                         </td>
-                        <td>
-                          <div style={{ fontWeight: 'var(--fw-semi)' }}>{r.customerName}</div>
-                          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
+                        <td className="cell-strong">
+                          {r.customerName}
+                          <div className="cell-muted" style={{ fontSize: 'var(--fs-xs)', fontWeight: 'var(--fw-normal)' }}>
                             {r.customerPhone}
                           </div>
                         </td>
-                        <td style={{ color: 'var(--text-secondary)' }}>
-                          {r.treatmentName || '—'}
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
+                        <td className="cell-sub">{r.treatmentName || '—'}</td>
+                        <td className="cell-right">
                           <span className={`c-badge ${STATUS_BADGE[r.status] || 'c-badge-gray'}`}>
                             {STATUS_LABEL[r.status] || r.status}
                           </span>
@@ -289,12 +259,11 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           </div>
 
           {/* 다가오는 예약 */}
-          <div className="card" style={{ padding: 20, border: '1px solid var(--border)' }}>
+          <div className="admin-card">
             <div className="card-header">
               <div>
                 <div className="card-title">
-                  <span className="material-symbols-rounded" style={{ verticalAlign: 'middle', marginRight: 6 }}>calendar_month</span>
-                  다가오는 예약 (7일)
+                  <span className="material-symbols-rounded">calendar_month</span>다가오는 예약 (7일)
                 </div>
                 <div className="card-subtitle">
                   대기 {pendingCount}건 · 확정 {confirmedCount}건
@@ -311,30 +280,31 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                 <table className="c-table">
                   <thead>
                     <tr>
-                      <th style={{ width: 120 }}>날짜</th>
-                      <th style={{ width: 80 }}>시간</th>
+                      <th>날짜</th>
+                      <th>시간</th>
                       <th>고객명</th>
                       <th>시술</th>
-                      <th style={{ textAlign: 'right' }}>상태</th>
+                      <th className="cell-right">상태</th>
                     </tr>
                   </thead>
                   <tbody>
                     {upcomingReservations.slice(0, 10).map((r) => (
                       <tr key={r.id}>
-                        <td style={{ color: 'var(--text-secondary)' }}>
-                          {new Date((r.reservedDate as unknown as string) + 'T00:00:00').toLocaleDateString(
-                            'ko-KR',
-                            { month: 'numeric', day: 'numeric', weekday: 'short' },
-                          )}
+                        <td className="cell-sub">
+                          {new Date(
+                            (r.reservedDate as unknown as string) + 'T00:00:00',
+                          ).toLocaleDateString('ko-KR', {
+                            month: 'numeric',
+                            day: 'numeric',
+                            weekday: 'short',
+                          })}
                         </td>
-                        <td style={{ fontWeight: 600 }}>
+                        <td className="cell-accent">
                           {(r.reservedTime as unknown as string)?.slice(0, 5) || '—'}
                         </td>
-                        <td style={{ fontWeight: 'var(--fw-semi)' }}>{r.customerName}</td>
-                        <td style={{ color: 'var(--text-secondary)' }}>
-                          {r.treatmentName || '—'}
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
+                        <td className="cell-strong">{r.customerName}</td>
+                        <td className="cell-sub">{r.treatmentName || '—'}</td>
+                        <td className="cell-right">
                           <span className={`c-badge ${STATUS_BADGE[r.status] || 'c-badge-gray'}`}>
                             {STATUS_LABEL[r.status] || r.status}
                           </span>
@@ -348,15 +318,13 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
           </div>
         </div>
 
-        {/* 우측 영역 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-lg)' }}>
+        <div className="admin-stack">
           {/* 진행 중 작업 */}
-          <div className="card" style={{ padding: 20, border: '1px solid var(--border)' }}>
+          <div className="admin-card">
             <div className="card-header">
               <div>
                 <div className="card-title">
-                  <span className="material-symbols-rounded" style={{ verticalAlign: 'middle', marginRight: 6 }}>build</span>
-                  진행 중 작업
+                  <span className="material-symbols-rounded">build</span>진행 중 작업
                 </div>
                 <div className="card-subtitle">최근 5건</div>
               </div>
@@ -369,49 +337,30 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                 <div className="c-empty-text">진행 중인 작업이 없습니다.</div>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <ul className="c-list">
                 {pendingWork.map((w) => (
-                  <div
-                    key={w.id}
-                    style={{
-                      padding: 'var(--sp-md)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-md)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
-                      <div
-                        style={{
-                          fontSize: 'var(--fs-sm)',
-                          fontWeight: 'var(--fw-semi)',
-                          flex: 1,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {w.title}
-                      </div>
+                  <li key={w.id} className="c-list-item">
+                    <div className="c-list-title">{w.title}</div>
+                    <div className="c-list-meta">
                       <span className={`c-badge ${WORK_STATUS_BADGE[w.status] || 'c-badge-gray'}`}>
                         {WORK_STATUS_LABEL[w.status] || w.status}
                       </span>
+                      <span className="cell-muted">
+                        {new Date(w.createdAt).toLocaleDateString('ko-KR')}
+                      </span>
                     </div>
-                    <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
-                      {new Date(w.createdAt).toLocaleDateString('ko-KR')}
-                    </div>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
           </div>
 
           {/* 워크보드 소식 */}
-          <div className="card" style={{ padding: 20, border: '1px solid var(--border)' }}>
+          <div className="admin-card">
             <div className="card-header">
               <div>
                 <div className="card-title">
-                  <span className="material-symbols-rounded" style={{ verticalAlign: 'middle', marginRight: 6 }}>forum</span>
-                  워크보드 소식
+                  <span className="material-symbols-rounded">forum</span>워크보드 소식
                 </div>
                 <div className="card-subtitle">{myWb[0]?.wbName ?? '파트너 공유 보드'}</div>
               </div>
@@ -426,35 +375,17 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                 <div className="c-empty-text">최근 게시물이 없습니다.</div>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <ul className="c-list">
                 {recentPosts.map((p) => (
-                  <div
-                    key={p.id}
-                    style={{
-                      padding: 'var(--sp-md)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-md)',
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 'var(--fs-sm)',
-                        fontWeight: 'var(--fw-semi)',
-                        marginBottom: 4,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {p.title}
-                    </div>
-                    <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
+                  <li key={p.id} className="c-list-item">
+                    <div className="c-list-title">{p.title}</div>
+                    <div className="c-list-meta cell-muted">
                       {p.boardName} · {p.authorName ?? '파트너'} ·{' '}
                       {new Date(p.createdAt).toLocaleDateString('ko-KR')}
                     </div>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
           </div>
         </div>

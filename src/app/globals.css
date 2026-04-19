@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/*
+ * 루딤웹 전역 스타일 — 루딤링크(admin.css) 디자인 시스템을 기반으로 한다.
+ *
+ * 원칙:
+ *  - body 기본 배경·폰트는 여기서 정하지 않는다. 각 root 이 토큰 기반으로 스타일링.
+ *  - admin 페이지는 `_theme/roodim-link.css` 가 로드되며, body.roodim-admin class 에서
+ *    배경·폰트를 강제한다.
+ *  - 공개 사이트(스킨 렌더러) 는 template-engine 의 자체 <style> 로 오버라이드한다.
+ *
+ * 더 이상 body 레벨의 흰색/Arial override 를 두지 않는다 (그 값이 admin 의 루딤링크
+ * 톤을 덮어쓰던 문제가 있었음).
+ */
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -19,8 +32,262 @@
   }
 }
 
+html,
 body {
-  background: var(--background);
+  min-height: 100%;
+}
+
+body {
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+/*
+ * admin 영역은 루딤링크 테마 적용.
+ * admin/[slug]/layout.tsx 에서 <body> 대신 wrapper div 에 이 class 를 주지 않고,
+ * AdminLayout 에서 body 레벨로 class 가 적용될 수 있도록 Next 가 허용하는
+ * 범위(클라이언트 useEffect) 로 처리한다.
+ */
+body.roodim-admin {
+  background: var(--bg-primary, #f8f6f5);
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', sans-serif;
+  color: var(--text-primary, #1f1f1f);
+  font-size: var(--fs-base, 14px);
+}
+
+/*
+ * ===== admin 공용 유틸 클래스 =====
+ * inline style 남발을 막기 위한 최소 유틸. 루딤링크 기본 토큰 재사용.
+ */
+
+/* 패딩·테두리가 들어간 카드 — Laravel 루딤링크는 style="padding:20px" 로 매번 추가했으나
+   Next 측은 반복을 줄이기 위해 헬퍼 클래스 사용 */
+body.roodim-admin .admin-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition: all var(--transition);
+}
+
+/* 세로로 gap 을 두는 스택 */
+body.roodim-admin .admin-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-lg);
+}
+
+/* 대시보드형 2단 그리드 (좌측이 넓고 우측이 좁음) */
+body.roodim-admin .admin-2col {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
+  gap: var(--sp-lg);
+  align-items: start;
+  margin-top: var(--sp-xl);
+}
+@media (max-width: 900px) {
+  body.roodim-admin .admin-2col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 주소록형 2단 그리드 (리스트 좌측 고정폭 + 상세 우측 가변) */
+body.roodim-admin .admin-ab-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: var(--sp-lg);
+  align-items: start;
+}
+@media (max-width: 900px) {
+  body.roodim-admin .admin-ab-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 카드 제목 앞의 material-symbols 아이콘 유틸 */
+body.roodim-admin .card-title .material-symbols-rounded {
+  vertical-align: middle;
+  margin-right: 6px;
+  font-size: 20px;
+  color: var(--accent);
+}
+
+/* 테이블 셀 공용 */
+body.roodim-admin .c-table td.cell-strong { font-weight: var(--fw-semi); }
+body.roodim-admin .c-table td.cell-sub { color: var(--text-secondary); }
+body.roodim-admin .c-table td.cell-muted { color: var(--text-tertiary); }
+body.roodim-admin .c-table td.cell-accent { font-weight: 700; color: var(--accent); }
+body.roodim-admin .c-table td.cell-right { text-align: right; }
+body.roodim-admin .c-table th.cell-right { text-align: right; }
+
+/* 간단 리스트 — 진행 중 작업, 워크보드 소식 등 카드 내 리스트 */
+body.roodim-admin .c-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+body.roodim-admin .c-list-item {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+body.roodim-admin .c-list-item:hover {
+  background: var(--bg-tertiary);
+}
+body.roodim-admin .c-list-title {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semi);
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.roodim-admin .c-list-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+/* c-page-header — 대시보드·주소록 상단 타이틀 블록 */
+body.roodim-admin .c-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: var(--sp-xl);
+}
+
+/* ===== 주소록(ab-*) 전용 스타일 ===== */
+body.roodim-admin .ab-side {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+body.roodim-admin .ab-search {
+  position: relative;
+  padding: var(--sp-md) var(--sp-md) 4px;
+  border-bottom: 1px solid var(--border);
+}
+body.roodim-admin .ab-search .form-input { padding-left: 34px; width: 100%; }
+body.roodim-admin .ab-search-icon {
+  position: absolute;
+  left: var(--sp-md);
+  top: calc(50% - 2px);
+  transform: translateY(-50%);
+  margin-left: 10px;
+  font-size: 18px !important;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+body.roodim-admin .ab-count {
+  padding: 8px var(--sp-md) 8px;
+  border-bottom: 1px solid var(--border);
+}
+body.roodim-admin .ab-list {
+  max-height: calc(100vh - 280px);
+  overflow-y: auto;
+}
+body.roodim-admin .ab-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--sp-md) var(--sp-lg);
+  border: none;
+  background: transparent;
+  border-left: 3px solid transparent;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+body.roodim-admin .ab-row:hover { background: var(--bg-tertiary); }
+body.roodim-admin .ab-row.active {
+  background: var(--bg-tertiary);
+  border-left-color: var(--accent);
+}
+body.roodim-admin .ab-row-name {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semi);
+  margin-bottom: 4px;
+}
+body.roodim-admin .ab-row-phone {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+}
+body.roodim-admin .ab-row-meta { display: flex; align-items: center; gap: 6px; }
+
+/* 차트 상세 */
+body.roodim-admin .ab-detail-head { align-items: flex-start; }
+body.roodim-admin .ab-detail-meta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+body.roodim-admin .ab-detail-meta .material-symbols-rounded {
+  vertical-align: middle;
+  font-size: 16px !important;
+  margin-right: 4px;
+  color: var(--text-tertiary);
+}
+body.roodim-admin .ab-visit-total { text-align: right; }
+body.roodim-admin .ab-visit-total-num {
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-black);
+  color: var(--accent);
+  line-height: 1;
+}
+body.roodim-admin .ab-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-md);
+  margin-bottom: var(--sp-lg);
+}
+body.roodim-admin .ab-stat-box {
+  padding: var(--sp-md);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+body.roodim-admin .ab-stat-value {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semi);
+  margin-top: 4px;
+}
+body.roodim-admin .ab-section-title {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semi);
+  color: var(--text-secondary);
+  margin-bottom: var(--sp-sm);
+}
+body.roodim-admin .ab-history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+body.roodim-admin .ab-history-time {
+  margin-left: 8px;
+  color: var(--text-tertiary);
+  font-weight: var(--fw-normal);
+}
+body.roodim-admin .ab-history-treat {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+body.roodim-admin .ab-history-memo {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  margin-top: 6px;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+}
+body.roodim-admin .ab-memo-user { background: var(--bg-primary); }
+body.roodim-admin .ab-memo-admin {
+  background: #fffbeb;
+  border-left: 3px solid #fbbf24;
 }

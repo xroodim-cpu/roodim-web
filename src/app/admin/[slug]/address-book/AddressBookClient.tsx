@@ -45,7 +45,11 @@ function formatDate(iso: string): string {
   if (!iso) return '—';
   try {
     const d = new Date(iso + 'T00:00:00');
-    return d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' });
+    return d.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
   } catch {
     return iso;
   }
@@ -90,71 +94,32 @@ export default function AddressBookClient({ charts }: Props) {
       </div>
 
       {charts.length === 0 ? (
-        <div className="card" style={{ padding: 20, border: '1px solid var(--border)' }}>
+        <div className="admin-card">
           <div className="c-empty">
             <div className="c-empty-icon">📇</div>
             <div className="c-empty-text">등록된 고객이 없습니다</div>
-            <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-tertiary)', marginTop: 6 }}>
+            <p className="c-page-subtitle">
               홈페이지 예약 기능을 통해 예약이 들어오면 자동으로 주소록에 등록됩니다.
             </p>
           </div>
         </div>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(280px, 360px) 1fr',
-            gap: 'var(--sp-lg)',
-            alignItems: 'start',
-          }}
-        >
+        <div className="admin-ab-grid">
           {/* 좌측: 고객 리스트 */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div
-              style={{
-                padding: 'var(--sp-md)',
-                borderBottom: '1px solid var(--border)',
-              }}
-            >
-              <div style={{ position: 'relative' }}>
-                <span
-                  className="material-symbols-rounded"
-                  style={{
-                    position: 'absolute',
-                    left: 10,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    fontSize: 18,
-                    color: 'var(--text-tertiary)',
-                  }}
-                >
-                  search
-                </span>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="이름·전화·이메일 검색"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  style={{ width: '100%', paddingLeft: 34 }}
-                />
-              </div>
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: 'var(--fs-xs)',
-                  color: 'var(--text-tertiary)',
-                }}
-              >
-                총 {filtered.length}명
-              </div>
+          <aside className="admin-card ab-side">
+            <div className="ab-search">
+              <span className="material-symbols-rounded ab-search-icon">search</span>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="이름·전화·이메일 검색"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
             </div>
-            <div
-              style={{
-                maxHeight: 'calc(100vh - 280px)',
-                overflowY: 'auto',
-              }}
-            >
+            <div className="card-subtitle ab-count">총 {filtered.length}명</div>
+
+            <div className="ab-list">
               {filtered.map((c) => {
                 const isActive = selected?.phone === c.phone;
                 return (
@@ -162,45 +127,13 @@ export default function AddressBookClient({ charts }: Props) {
                     key={c.phone}
                     type="button"
                     onClick={() => setSelectedPhone(c.phone)}
-                    className={isActive ? 'ab-row active' : 'ab-row'}
-                    style={{
-                      display: 'block',
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: 'var(--sp-md) var(--sp-lg)',
-                      border: 'none',
-                      background: isActive ? 'var(--bg-secondary)' : 'transparent',
-                      borderLeft: isActive
-                        ? '3px solid var(--accent)'
-                        : '3px solid transparent',
-                      cursor: 'pointer',
-                      borderBottom: '1px solid var(--border)',
-                    }}
+                    className={`ab-row${isActive ? ' active' : ''}`}
                   >
-                    <div
-                      style={{
-                        fontSize: 'var(--fs-sm)',
-                        fontWeight: 'var(--fw-semi)',
-                        color: 'var(--text-primary)',
-                        marginBottom: 4,
-                      }}
-                    >
-                      {c.name}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 'var(--fs-xs)',
-                        color: 'var(--text-tertiary)',
-                        marginBottom: 6,
-                      }}
-                    >
-                      {c.phone}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div className="ab-row-name">{c.name}</div>
+                    <div className="ab-row-phone">{c.phone}</div>
+                    <div className="ab-row-meta">
                       <span className="c-badge c-badge-gray">방문 {c.visitCount}회</span>
-                      <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>
-                        최근 {formatDate(c.lastVisit)}
-                      </span>
+                      <span className="cell-sub">최근 {formatDate(c.lastVisit)}</span>
                     </div>
                   </button>
                 );
@@ -211,182 +144,78 @@ export default function AddressBookClient({ charts }: Props) {
                 </div>
               )}
             </div>
-          </div>
+          </aside>
 
           {/* 우측: 선택 고객의 차트 */}
           {selected ? (
-            <div className="card" style={{ padding: 20, border: '1px solid var(--border)' }}>
-              <div
-                className="card-header"
-                style={{ alignItems: 'flex-start' }}
-              >
+            <section className="admin-card">
+              <div className="card-header ab-detail-head">
                 <div>
                   <div className="card-title">{selected.name}</div>
-                  <div className="card-subtitle" style={{ marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <div className="card-subtitle ab-detail-meta">
                     <span>
-                      <span className="material-symbols-rounded" style={{ verticalAlign: 'middle', fontSize: 16, marginRight: 4 }}>call</span>
+                      <span className="material-symbols-rounded">call</span>
                       {selected.phone}
                     </span>
                     {selected.email && (
                       <span>
-                        <span className="material-symbols-rounded" style={{ verticalAlign: 'middle', fontSize: 16, marginRight: 4 }}>mail</span>
+                        <span className="material-symbols-rounded">mail</span>
                         {selected.email}
                       </span>
                     )}
                   </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div
-                    style={{
-                      fontSize: 'var(--fs-2xl)',
-                      fontWeight: 'var(--fw-black)',
-                      color: 'var(--accent)',
-                      lineHeight: 1,
-                    }}
-                  >
-                    {selected.visitCount}
-                  </div>
-                  <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
-                    총 방문
-                  </div>
+                <div className="ab-visit-total">
+                  <div className="ab-visit-total-num">{selected.visitCount}</div>
+                  <div className="card-subtitle">총 방문</div>
                 </div>
               </div>
 
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: 'var(--sp-md)',
-                  marginBottom: 'var(--sp-lg)',
-                }}
-              >
-                <div
-                  style={{
-                    padding: 'var(--sp-md)',
-                    background: 'var(--bg-secondary)',
-                    borderRadius: 'var(--radius-md)',
-                  }}
-                >
-                  <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                    첫 방문
-                  </div>
-                  <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 'var(--fw-semi)' }}>
-                    {formatDate(selected.firstVisit)}
-                  </div>
+              <div className="ab-stat-grid">
+                <div className="ab-stat-box">
+                  <div className="card-subtitle">첫 방문</div>
+                  <div className="ab-stat-value">{formatDate(selected.firstVisit)}</div>
                 </div>
-                <div
-                  style={{
-                    padding: 'var(--sp-md)',
-                    background: 'var(--bg-secondary)',
-                    borderRadius: 'var(--radius-md)',
-                  }}
-                >
-                  <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                    최근 방문
-                  </div>
-                  <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 'var(--fw-semi)' }}>
-                    {formatDate(selected.lastVisit)}
-                  </div>
+                <div className="ab-stat-box">
+                  <div className="card-subtitle">최근 방문</div>
+                  <div className="ab-stat-value">{formatDate(selected.lastVisit)}</div>
                 </div>
               </div>
 
-              <div
-                style={{
-                  fontSize: 'var(--fs-sm)',
-                  fontWeight: 'var(--fw-semi)',
-                  color: 'var(--text-secondary)',
-                  marginBottom: 'var(--sp-sm)',
-                }}
-              >
-                방문 이력
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div className="ab-section-title">방문 이력</div>
+              <ul className="c-list">
                 {selected.reservations.map((r) => (
-                  <div
-                    key={r.id}
-                    style={{
-                      padding: 'var(--sp-md)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-md)',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        marginBottom: 6,
-                        flexWrap: 'wrap',
-                        gap: 8,
-                      }}
-                    >
-                      <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 'var(--fw-semi)' }}>
+                  <li key={r.id} className="c-list-item ab-history-item">
+                    <div className="ab-history-head">
+                      <div className="c-list-title">
                         {formatDate(r.date)}
-                        {r.time && (
-                          <span
-                            style={{
-                              marginLeft: 8,
-                              color: 'var(--text-tertiary)',
-                              fontWeight: 'var(--fw-normal)',
-                            }}
-                          >
-                            {formatTime(r.time)}
-                          </span>
-                        )}
+                        {r.time && <span className="ab-history-time">{formatTime(r.time)}</span>}
                       </div>
                       <span className={`c-badge ${STATUS_BADGE[r.status] || 'c-badge-gray'}`}>
                         {STATUS_LABEL[r.status] || r.status}
                       </span>
                     </div>
-                    {r.treatment && (
-                      <div
-                        style={{
-                          fontSize: 'var(--fs-sm)',
-                          color: 'var(--text-secondary)',
-                          marginBottom: 4,
-                        }}
-                      >
-                        시술: {r.treatment}
-                      </div>
-                    )}
+                    {r.treatment && <div className="ab-history-treat">시술: {r.treatment}</div>}
                     {r.memo && (
-                      <div
-                        style={{
-                          fontSize: 'var(--fs-xs)',
-                          color: 'var(--text-tertiary)',
-                          marginTop: 6,
-                          padding: 8,
-                          background: 'var(--bg-secondary)',
-                          borderRadius: 'var(--radius-sm)',
-                        }}
-                      >
+                      <div className="ab-history-memo ab-memo-user">
                         <strong>고객 메모:</strong> {r.memo}
                       </div>
                     )}
                     {r.adminMemo && (
-                      <div
-                        style={{
-                          fontSize: 'var(--fs-xs)',
-                          color: 'var(--text-tertiary)',
-                          marginTop: 6,
-                          padding: 8,
-                          background: '#fffbeb',
-                          borderRadius: 'var(--radius-sm)',
-                          borderLeft: '3px solid #fbbf24',
-                        }}
-                      >
+                      <div className="ab-history-memo ab-memo-admin">
                         <strong>차트 메모:</strong> {r.adminMemo}
                       </div>
                     )}
-                  </div>
+                  </li>
                 ))}
-              </div>
-            </div>
+              </ul>
+            </section>
           ) : (
-            <div className="card" style={{ padding: 20, border: '1px solid var(--border)' }}>
+            <section className="admin-card">
               <div className="c-empty">
                 <div className="c-empty-text">좌측에서 고객을 선택하세요.</div>
               </div>
-            </div>
+            </section>
           )}
         </div>
       )}
