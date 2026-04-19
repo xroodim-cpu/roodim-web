@@ -1343,333 +1343,25 @@ img.avatar,
 .c-role-dot-partner  { background: var(--info); }
 .c-role-dot-staff    { background: var(--text-tertiary); }
 
-/* ============================================
-   Boards (게시판) — 전용 보조 스타일
-   (기존 .wb-wrap / .wb-side / .pd-side-group / .pd-filter / .c-table / .c-badge / .slide-panel 재사용)
-   ============================================ */
-.bd-page-wrap {
-    display: grid;
-    grid-template-columns: 240px 1fr;
-    gap: 0;
-    margin: -24px -40px 0;
-    min-height: calc(100vh - var(--header-height, 60px));
-}
-.bd-side {
-    background: var(--wb-bg-side, var(--bg-secondary));
-    border-right: 1px solid var(--border);
-    padding: 20px 16px;
-    height: calc(100vh - var(--header-height, 60px));
-    position: sticky;
-    top: var(--header-height, 60px);
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-}
-.bd-main {
-    min-width: 0;
-    padding: 24px 40px 40px;
-    background: var(--bg-secondary);
-}
-.bd-side-heading {
-    font-size: var(--fs-xs);
-    font-weight: var(--fw-bold);
-    color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 0 12px 12px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 12px;
-}
-.bd-side-row {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-}
-.bd-side-btn {
-    flex: 1;
-    min-width: 0;
-    background: none;
-    border: none;
-    font: inherit;
-    cursor: pointer;
-    text-align: left;
-}
-.bd-side-btn .bd-side-name {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.bd-side-pin {
-    font-size: var(--fs-xs);
-    flex-shrink: 0;
-}
-.bd-side-delete {
-    background: none;
-    border: none;
-    color: var(--text-tertiary);
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: var(--radius-sm);
-    font-size: 16px;
-    line-height: 1;
-    flex-shrink: 0;
-    transition: color .15s, background .15s;
-}
-.bd-side-delete:hover {
-    color: var(--error);
-    background: var(--status-error-bg);
-}
-.bd-side-add {
-    padding: 16px 12px 0;
-    margin-top: 12px;
-    border-top: 1px solid var(--border);
-}
-.bd-side-add-btn { width: 100%; }
-.bd-side-add-form {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-.bd-side-add-actions {
-    display: flex;
-    gap: 6px;
-}
-.bd-side-add-actions .btn { flex: 1; }
-.bd-side-toggle { display: none; }
-
-/* 메인 페이지 헤더 */
-.bd-page-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 20px;
-}
-.bd-page-header-left {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    min-width: 0;
-}
-
-/* 페이지네이션 */
-.bd-pagination {
-    display: flex;
-    justify-content: center;
-    gap: 4px;
-    padding: 16px 0;
-}
-
-/* 슬라이드 패널 내부 */
-.bd-inquiry-data {
-    background: var(--bg-secondary);
-    padding: 16px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-light);
-}
-.bd-inquiry-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    margin-top: 8px;
-}
-.bd-inquiry-row {
-    display: flex;
-    gap: 8px;
-    font-size: var(--fs-sm);
-    padding: 6px 0;
-    border-bottom: 1px solid var(--border-light);
-}
-.bd-inquiry-row:last-child { border-bottom: none; }
-.bd-inquiry-key {
-    font-weight: var(--fw-medium);
-    min-width: 96px;
-    color: var(--text-secondary);
-}
-.bd-inquiry-val { color: var(--text-primary); flex: 1; }
-.bd-pin-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-.bd-pin-row label {
-    font-size: var(--fs-sm);
-    cursor: pointer;
-    margin: 0;
-}
-.bd-form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    padding-top: 12px;
-    border-top: 1px solid var(--border);
-    margin-top: 8px;
-}
-
-@media (max-width: 768px) {
-    .bd-page-wrap {
-        grid-template-columns: 1fr;
-        margin: -24px -16px 0;
-    }
-    .bd-side {
-        position: fixed;
-        top: 0;
-        left: 0;
-        height: 100%;
-        width: 280px;
-        z-index: 200;
-        padding: 20px;
-        transform: translateX(-100%);
-        transition: transform 0.3s ease;
-    }
-    .bd-side.open { transform: translateX(0); }
-    .bd-main { padding: 16px; }
-    .bd-side-toggle { display: inline-flex; }
-}
-
-/* ============================================
-   Rich Text Editor (TipTap) 스타일
-   ============================================ */
-.rte-wrap {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    background: var(--bg-primary);
-}
-.rte-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 2px;
-    padding: 6px 8px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-secondary);
-}
-.rte-btn {
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-sm);
-    padding: 6px 8px;
-    cursor: pointer;
-    color: var(--text-secondary);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: background .15s, color .15s;
-}
-.rte-btn:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-}
-.rte-btn.is-active {
-    background: var(--bg-tertiary);
-    color: var(--accent);
-}
-.rte-divider {
-    width: 1px;
-    height: 18px;
-    background: var(--border);
-    margin: 0 4px;
-}
-.rte-content {
-    padding: 12px 16px;
-    cursor: text;
-}
-.rte-content .tiptap {
-    outline: none;
-    font-size: var(--fs-sm);
-    color: var(--text-primary);
-    line-height: 1.65;
-}
-.rte-content .tiptap p.is-editor-empty:first-child::before {
-    content: attr(data-placeholder);
-    float: left;
-    color: var(--text-tertiary);
-    pointer-events: none;
-    height: 0;
-}
-.rte-content .tiptap h2 {
-    font-size: var(--fs-lg);
-    font-weight: var(--fw-bold);
-    margin: 16px 0 8px;
-}
-.rte-content .tiptap h3 {
-    font-size: var(--fs-base);
-    font-weight: var(--fw-bold);
-    margin: 12px 0 6px;
-}
-.rte-content .tiptap ul,
-.rte-content .tiptap ol {
-    padding-left: 20px;
-}
-.rte-content .tiptap blockquote {
-    border-left: 3px solid var(--border);
-    padding-left: 12px;
-    color: var(--text-secondary);
-    margin: 8px 0;
-}
-.rte-content .tiptap a {
-    color: var(--accent);
-    text-decoration: underline;
-}
-.rte-content .tiptap img {
-    max-width: 100%;
-    border-radius: var(--radius-sm);
-    margin: 8px 0;
-}
-.rte-content .tiptap hr {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 16px 0;
-}
-.rte-content .tiptap p { margin: 0 0 8px; }
-
 /* ============================================================
- * 루딤웹 admin 전용 유틸 & 페이지 구조 클래스 — body.roodim-admin scope
- * ============================================================
- * 목적: admin 페이지들에서 inline style 을 최대한 제거하고 공용 클래스로 통일.
- * 루딤링크(Laravel)의 .card / .c-* / .bd-* / .pd-* / .hp-* 패턴을 존중하면서,
- * Next.js 리액트 컴포넌트 특성상 반복되는 패턴을 유틸화.
- */
+ * [roodim-web 전용 추가] — 원본 admin.css 를 건드리지 않음.
+ *
+ * Next.js 컴포넌트 특성상 반복되는 패턴(카드 padding + border,
+ * 대시보드 2단 그리드, 테이블 셀 tiny 스타일, 주소록 전용 UI 등)
+ * 을 유틸 클래스로 묶어 inline style 제거용으로 추가.
+ *
+ * admin/[slug]/layout.tsx 에서만 이 파일을 import 하므로
+ * 공개 사이트(스킨 렌더러) 에는 영향 없음.
+ * ============================================================ */
 
-/* ===== body 토큰 활성화 (admin 영역 진입 시) =====
- * 사용자 피드백: 루딤링크 대비 글자가 작아 보임 → 전 토큰 한 단계 up.
- * 루딤링크 Laravel 원본은 14/15/16/17/18/20/24/28 이지만 루딤웹은 여백이 더 넓고
- * 사이드바 유무 차이가 있어 시각적으로 작게 느껴짐. admin scope 에서만 재정의.
- */
+/* ===== admin root 식별용 (AdminLayout useEffect 로 body 에 toggle) ===== */
 body.roodim-admin {
-  --fs-xs:   15px;  /* was 14 */
-  --fs-sm:   16px;  /* was 15 */
-  --fs-base: 17px;  /* was 16 */
-  --fs-md:   18px;  /* was 17 */
-  --fs-lg:   20px;  /* was 18 */
-  --fs-xl:   22px;  /* was 20 */
-  --fs-2xl:  26px;  /* was 24 */
-  --fs-3xl:  32px;  /* was 28 */
-
-  background: var(--bg-primary, #f8f6f5);
-  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
-    system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', sans-serif;
-  color: var(--text-primary, #1f1f1f);
-  font-size: var(--fs-base);
-  line-height: 1.55;
-}
-
-/* wb-main 을 넓은 뷰포트에서 과하게 퍼지지 않게 중앙 정렬
- * (루딤링크 /boards 는 좌측 사이드바 250px 때문에 자연스럽게 컴팩트했지만
- *  루딤웹 admin 은 서브메뉴 없는 페이지에서 너무 spread 됨) */
-body.roodim-admin .wb-main {
-  max-width: 1400px;
-  margin-left: auto;
-  margin-right: auto;
-  width: 100%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 /* ===== 페이지 공통 ===== */
-/* 페이지 헤더 (제목 + 부제목 + 우측 액션) */
-body.roodim-admin .c-page-header {
+.c-page-header {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -1677,8 +1369,8 @@ body.roodim-admin .c-page-header {
   margin-bottom: var(--sp-xl);
 }
 
-/* 카드 — Laravel 루딤링크 .card 에 padding 이 없어 매번 inline 이던 반복 제거 */
-body.roodim-admin .admin-card {
+/* 카드 — 원본 .card 에 padding 이 없어 매번 inline 이던 반복 제거 */
+.admin-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -1686,73 +1378,53 @@ body.roodim-admin .admin-card {
   transition: all var(--transition);
 }
 
-/* 세로 스택 (gap 큼) */
-body.roodim-admin .admin-stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-lg);
-}
-
-/* 대시보드 2단 그리드 (좌 1.8 : 우 1) */
-body.roodim-admin .admin-2col {
+/* 세로 스택 + 2단 그리드 */
+.admin-stack { display: flex; flex-direction: column; gap: var(--sp-lg); }
+.admin-2col {
   display: grid;
   grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
   gap: var(--sp-lg);
   align-items: start;
   margin-top: var(--sp-xl);
 }
-@media (max-width: 900px) {
-  body.roodim-admin .admin-2col { grid-template-columns: 1fr; }
-}
+@media (max-width: 900px) { .admin-2col { grid-template-columns: 1fr; } }
 
-/* 주소록 2단 (리스트 고정폭 + 상세 가변) */
-body.roodim-admin .admin-ab-grid {
+.admin-ab-grid {
   display: grid;
   grid-template-columns: minmax(280px, 360px) 1fr;
   gap: var(--sp-lg);
   align-items: start;
 }
-@media (max-width: 900px) {
-  body.roodim-admin .admin-ab-grid { grid-template-columns: 1fr; }
-}
+@media (max-width: 900px) { .admin-ab-grid { grid-template-columns: 1fr; } }
 
-/* ===== 카드 제목 앞 material-symbols 아이콘 ===== */
-body.roodim-admin .card-title .material-symbols-rounded {
+/* 카드 제목 앞 아이콘 */
+.card-title .material-symbols-rounded {
   vertical-align: middle;
   margin-right: 6px;
   font-size: 20px;
   color: var(--accent);
 }
 
-/* ===== 테이블 셀 공용 ===== */
-body.roodim-admin .c-table td.cell-strong { font-weight: var(--fw-semi); }
-body.roodim-admin .c-table td.cell-sub { color: var(--text-secondary); }
-body.roodim-admin .c-table td.cell-muted { color: var(--text-tertiary); }
-body.roodim-admin .c-table td.cell-accent { font-weight: 700; color: var(--accent); }
-body.roodim-admin .c-table td.cell-right,
-body.roodim-admin .c-table th.cell-right { text-align: right; }
+/* 테이블 셀 공용 */
+.c-table td.cell-strong { font-weight: var(--fw-semi); }
+.c-table td.cell-sub    { color: var(--text-secondary); }
+.c-table td.cell-muted  { color: var(--text-tertiary); }
+.c-table td.cell-accent { font-weight: 700; color: var(--accent); }
+.c-table td.cell-right,
+.c-table th.cell-right  { text-align: right; }
+.c-table.c-table-clickable tbody tr { cursor: pointer; }
+.c-table.c-table-clickable tbody tr:hover { background: var(--bg-tertiary); }
 
-/* 클릭 가능 테이블 */
-body.roodim-admin .c-table.c-table-clickable tbody tr { cursor: pointer; }
-body.roodim-admin .c-table.c-table-clickable tbody tr:hover { background: var(--bg-tertiary); }
-
-/* ===== 리스트 (c-list) ===== */
-body.roodim-admin .c-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-body.roodim-admin .c-list-item {
+/* 간단 리스트 */
+.c-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.c-list-item {
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--bg-primary);
 }
-body.roodim-admin .c-list-item:hover { background: var(--bg-tertiary); }
-body.roodim-admin .c-list-title {
+.c-list-item:hover { background: var(--bg-tertiary); }
+.c-list-title {
   font-size: var(--fs-sm);
   font-weight: var(--fw-semi);
   margin-bottom: 4px;
@@ -1760,7 +1432,7 @@ body.roodim-admin .c-list-title {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-body.roodim-admin .c-list-meta {
+.c-list-meta {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1768,32 +1440,18 @@ body.roodim-admin .c-list-meta {
   color: var(--text-tertiary);
 }
 
-/* ===== 링크 리셋 ===== */
-body.roodim-admin .c-link-reset {
-  color: inherit;
-  text-decoration: none;
-}
-body.roodim-admin .c-link-reset:hover { color: var(--accent); }
-
-/* ===== 로딩/알림 ===== */
-body.roodim-admin .c-spinner-lg { margin: 0 auto 12px; }
-body.roodim-admin .c-alert { margin-bottom: 16px; }
-body.roodim-admin .c-alert.c-alert-warning { font-size: var(--fs-sm); }
+/* 링크·로딩·알림 */
+.c-link-reset { color: inherit; text-decoration: none; }
+.c-link-reset:hover { color: var(--accent); }
+.c-spinner-lg { margin: 0 auto 12px; }
+.c-alert { margin-bottom: 16px; }
+.c-alert.c-alert-warning { font-size: var(--fs-sm); }
 
 /* ===== 주소록(ab-*) 전용 ===== */
-body.roodim-admin .ab-side {
-  padding: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-body.roodim-admin .ab-search {
-  position: relative;
-  padding: var(--sp-md) var(--sp-md) 4px;
-  border-bottom: 1px solid var(--border);
-}
-body.roodim-admin .ab-search .form-input { padding-left: 34px; width: 100%; }
-body.roodim-admin .ab-search-icon {
+.ab-side { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.ab-search { position: relative; padding: var(--sp-md) var(--sp-md) 4px; border-bottom: 1px solid var(--border); }
+.ab-search .form-input { padding-left: 34px; width: 100%; }
+.ab-search-icon {
   position: absolute;
   left: var(--sp-md);
   top: calc(50% - 2px);
@@ -1803,15 +1461,9 @@ body.roodim-admin .ab-search-icon {
   color: var(--text-tertiary);
   pointer-events: none;
 }
-body.roodim-admin .ab-count {
-  padding: 8px var(--sp-md) 8px;
-  border-bottom: 1px solid var(--border);
-}
-body.roodim-admin .ab-list {
-  max-height: calc(100vh - 280px);
-  overflow-y: auto;
-}
-body.roodim-admin .ab-row {
+.ab-count { padding: 8px var(--sp-md) 8px; border-bottom: 1px solid var(--border); }
+.ab-list { max-height: calc(100vh - 280px); overflow-y: auto; }
+.ab-row {
   display: block;
   width: 100%;
   text-align: left;
@@ -1822,93 +1474,29 @@ body.roodim-admin .ab-row {
   border-bottom: 1px solid var(--border);
   cursor: pointer;
 }
-body.roodim-admin .ab-row:hover { background: var(--bg-tertiary); }
-body.roodim-admin .ab-row.active {
-  background: var(--bg-tertiary);
-  border-left-color: var(--accent);
-}
-body.roodim-admin .ab-row-name {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semi);
-  margin-bottom: 4px;
-}
-body.roodim-admin .ab-row-phone {
-  font-size: var(--fs-xs);
-  color: var(--text-tertiary);
-  margin-bottom: 6px;
-}
-body.roodim-admin .ab-row-meta { display: flex; align-items: center; gap: 6px; }
+.ab-row:hover { background: var(--bg-tertiary); }
+.ab-row.active { background: var(--bg-tertiary); border-left-color: var(--accent); }
+.ab-row-name { font-size: var(--fs-sm); font-weight: var(--fw-semi); margin-bottom: 4px; }
+.ab-row-phone { font-size: var(--fs-xs); color: var(--text-tertiary); margin-bottom: 6px; }
+.ab-row-meta { display: flex; align-items: center; gap: 6px; }
 
-body.roodim-admin .ab-detail-head { align-items: flex-start; }
-body.roodim-admin .ab-detail-meta {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 4px;
-}
-body.roodim-admin .ab-detail-meta .material-symbols-rounded {
+.ab-detail-head { align-items: flex-start; }
+.ab-detail-meta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+.ab-detail-meta .material-symbols-rounded {
   vertical-align: middle;
   font-size: 16px !important;
   margin-right: 4px;
   color: var(--text-tertiary);
 }
-body.roodim-admin .ab-visit-total { text-align: right; }
-body.roodim-admin .ab-visit-total-num {
-  font-size: var(--fs-2xl);
-  font-weight: var(--fw-black);
-  color: var(--accent);
-  line-height: 1;
-}
-body.roodim-admin .ab-stat-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--sp-md);
-  margin-bottom: var(--sp-lg);
-}
-body.roodim-admin .ab-stat-box {
-  padding: var(--sp-md);
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-}
-body.roodim-admin .ab-stat-value {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semi);
-  margin-top: 4px;
-}
-body.roodim-admin .ab-section-title {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semi);
-  color: var(--text-secondary);
-  margin-bottom: var(--sp-sm);
-}
-body.roodim-admin .ab-history-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 6px;
-}
-body.roodim-admin .ab-history-time {
-  margin-left: 8px;
-  color: var(--text-tertiary);
-  font-weight: var(--fw-normal);
-}
-body.roodim-admin .ab-history-treat {
-  font-size: var(--fs-sm);
-  color: var(--text-secondary);
-  margin-bottom: 4px;
-}
-body.roodim-admin .ab-history-memo {
-  font-size: var(--fs-xs);
-  color: var(--text-tertiary);
-  margin-top: 6px;
-  padding: 8px;
-  border-radius: var(--radius-sm);
-}
-body.roodim-admin .ab-memo-user { background: var(--bg-primary); }
-body.roodim-admin .ab-memo-admin {
-  background: #fffbeb;
-  border-left: 3px solid #fbbf24;
-}
+.ab-visit-total { text-align: right; }
+.ab-visit-total-num { font-size: var(--fs-2xl); font-weight: var(--fw-black); color: var(--accent); line-height: 1; }
+.ab-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-md); margin-bottom: var(--sp-lg); }
+.ab-stat-box { padding: var(--sp-md); background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.ab-stat-value { font-size: var(--fs-sm); font-weight: var(--fw-semi); margin-top: 4px; }
+.ab-section-title { font-size: var(--fs-sm); font-weight: var(--fw-semi); color: var(--text-secondary); margin-bottom: var(--sp-sm); }
+.ab-history-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.ab-history-time { margin-left: 8px; color: var(--text-tertiary); font-weight: var(--fw-normal); }
+.ab-history-treat { font-size: var(--fs-sm); color: var(--text-secondary); margin-bottom: 4px; }
+.ab-history-memo { font-size: var(--fs-xs); color: var(--text-tertiary); margin-top: 6px; padding: 8px; border-radius: var(--radius-sm); }
+.ab-memo-user { background: var(--bg-primary); }
+.ab-memo-admin { background: #fffbeb; border-left: 3px solid #fbbf24; }
