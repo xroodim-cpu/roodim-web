@@ -92,7 +92,18 @@ export default function AdminLayout({
   const brandInitial = (siteName?.charAt(0) || 'R').toUpperCase();
 
   return (
-    <>
+    <div
+      className="roodim-admin-root"
+      style={{
+        // 루딤링크 테마 강제 — globals.css 의 body(흰색/Arial) 를 wrapper 레벨에서 덮음
+        minHeight: '100vh',
+        background: 'var(--bg-primary)',
+        fontFamily:
+          "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', sans-serif",
+        color: 'var(--text-primary)',
+        fontSize: 'var(--fs-base)',
+      }}
+    >
       {/* ===== 상단 네비게이션 — 루딤링크 app.blade 구조 그대로 ===== */}
       <nav className="topnav">
         <div className="topnav-inner">
@@ -280,6 +291,6 @@ export default function AdminLayout({
           onClick={() => setProfileOpen(false)}
         />
       )}
-    </>
+    </div>
   );
 }
