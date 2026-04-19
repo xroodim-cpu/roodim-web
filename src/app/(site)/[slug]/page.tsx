@@ -21,22 +21,14 @@ export async function generateMetadata({ params }: PageProps) {
   const keywords = (seo.meta_keywords as string) || (seo.keywords as string) || '';
   const ogImage = (seo.og_image as string) || '';
   const favicon = (seo.favicon_url as string) || (base.favicon_url as string) || '';
-  const robotsVal = (seo.robots as string) || 'index, follow';
-
-  // "index, follow" → { index: true, follow: true } 파싱
-  const parseRobots = (r: string) => {
-    const parts = r.toLowerCase().split(',').map((p) => p.trim());
-    return {
-      index: !parts.includes('noindex'),
-      follow: !parts.includes('nofollow'),
-    };
-  };
+  const robotsVal = ((seo.robots as string) || 'index, follow').trim();
 
   return {
     title,
     description,
     ...(keywords ? { keywords } : {}),
-    robots: parseRobots(robotsVal),
+    // robots 는 문자열 그대로 전달 → Next.js 가 <meta name="robots" content="..."> 로 바로 렌더
+    robots: robotsVal,
     ...(favicon ? { icons: { icon: favicon } } : {}),
     openGraph: {
       title,
