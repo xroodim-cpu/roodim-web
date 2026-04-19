@@ -20,9 +20,7 @@ const STATUS_BADGE: Record<string, string> = {
   completed: 'c-badge-success',
 };
 
-export default async function ReservationsPage({
-  params,
-}: ReservationsPageProps) {
+export default async function ReservationsPage({ params }: ReservationsPageProps) {
   const { slug } = await params;
 
   const site = await db.query.sites.findFirst({
@@ -31,7 +29,10 @@ export default async function ReservationsPage({
 
   if (!site) {
     return (
-      <div className="c-alert c-alert-error">사이트를 찾을 수 없습니다.</div>
+      <div className="c-empty">
+        <div className="c-empty-icon">⚠️</div>
+        <div className="c-empty-text">사이트를 찾을 수 없습니다.</div>
+      </div>
     );
   }
 
@@ -42,19 +43,15 @@ export default async function ReservationsPage({
     .orderBy((t) => t.createdAt);
 
   return (
-    <div>
-      <div style={{ marginBottom: 20 }}>
-        <h1 className="c-page-title">예약 관리</h1>
-        <p className="c-page-subtitle">고객 예약을 확인하고 관리하세요.</p>
+    <>
+      <div className="c-page-header">
+        <div>
+          <h1 className="c-page-title">예약 관리</h1>
+          <p className="c-page-subtitle">고객 예약을 확인하고 관리하세요.</p>
+        </div>
       </div>
 
-      <div
-        className="card"
-        style={{
-          border: '1px solid var(--border)',
-          overflow: 'hidden',
-        }}
-      >
+      <div className="admin-card">
         {reservations.length === 0 ? (
           <div className="c-empty">
             <div className="c-empty-icon">📅</div>
@@ -70,36 +67,27 @@ export default async function ReservationsPage({
                   <th>시술명</th>
                   <th>예약일</th>
                   <th>상태</th>
-                  <th style={{ textAlign: 'right', width: 100 }}>관리</th>
+                  <th className="cell-right">관리</th>
                 </tr>
               </thead>
               <tbody>
                 {reservations.map((res) => (
                   <tr key={res.id}>
-                    <td style={{ fontWeight: 'var(--fw-semi)' }}>
-                      {res.customerName}
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)' }}>
-                      {res.customerPhone}
-                    </td>
+                    <td className="cell-strong">{res.customerName}</td>
+                    <td className="cell-sub">{res.customerPhone}</td>
                     <td>{res.treatmentName || '—'}</td>
-                    <td style={{ color: 'var(--text-secondary)' }}>
+                    <td className="cell-sub">
                       {new Date(res.reservedDate).toLocaleDateString('ko-KR')}
                     </td>
                     <td>
                       <span
-                        className={`c-badge ${
-                          STATUS_BADGE[res.status] || 'c-badge-gray'
-                        }`}
+                        className={`c-badge ${STATUS_BADGE[res.status] || 'c-badge-gray'}`}
                       >
                         {STATUS_LABEL[res.status] || res.status}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                      >
+                    <td className="cell-right">
+                      <button type="button" className="btn btn-secondary btn-sm">
                         수정
                       </button>
                     </td>
@@ -110,6 +98,6 @@ export default async function ReservationsPage({
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }

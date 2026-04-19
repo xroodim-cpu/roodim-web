@@ -126,28 +126,18 @@ export default function WorkPage({
   if (!slug) {
     return (
       <div className="c-empty">
-        <div className="spinner" style={{ margin: '0 auto 12px' }} />
+        <div className="spinner c-spinner-lg" />
         <div className="c-empty-text">로딩 중...</div>
       </div>
     );
   }
 
   return (
-    <div>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 20,
-          gap: 16,
-        }}
-      >
+    <>
+      <div className="c-page-header">
         <div>
           <h1 className="c-page-title">작업</h1>
-          <p className="c-page-subtitle">
-            유지보수 요청과 채팅을 관리하세요.
-          </p>
+          <p className="c-page-subtitle">유지보수 요청과 채팅을 관리하세요.</p>
         </div>
         <button
           type="button"
@@ -159,34 +149,18 @@ export default function WorkPage({
           }}
           disabled={syncing}
         >
-          {syncing ? '동기화 중...' : '↻ 동기화'}
+          <span className="material-symbols-rounded">sync</span>
+          {syncing ? '동기화 중...' : '동기화'}
         </button>
       </div>
 
-      {error && (
-        <div className="c-alert c-alert-error" style={{ marginBottom: 16 }}>
-          {error}
-        </div>
-      )}
-      {syncError && (
-        <div
-          className="c-alert c-alert-warning"
-          style={{ marginBottom: 16, fontSize: 'var(--fs-sm)' }}
-        >
-          {syncError}
-        </div>
-      )}
+      {error && <div className="c-alert c-alert-error">{error}</div>}
+      {syncError && <div className="c-alert c-alert-warning">{syncError}</div>}
 
-      <div
-        className="card"
-        style={{
-          border: '1px solid var(--border)',
-          overflow: 'hidden',
-        }}
-      >
+      <div className="admin-card">
         {loading ? (
           <div className="c-empty">
-            <div className="spinner" style={{ margin: '0 auto 12px' }} />
+            <div className="spinner c-spinner-lg" />
             <div className="c-empty-text">로딩 중...</div>
           </div>
         ) : filteredRequests.length === 0 ? (
@@ -196,7 +170,7 @@ export default function WorkPage({
           </div>
         ) : (
           <div className="table-wrap">
-            <table className="c-table">
+            <table className="c-table c-table-clickable">
               <thead>
                 <tr>
                   <th>제목</th>
@@ -210,25 +184,19 @@ export default function WorkPage({
                 {filteredRequests.map((request) => (
                   <tr
                     key={request.id}
-                    style={{ cursor: 'pointer' }}
                     onClick={() => {
                       window.location.href = `/admin/${slug}/work/${request.id}`;
                     }}
                   >
-                    <td style={{ fontWeight: 'var(--fw-semi)' }}>
+                    <td className="cell-strong">
                       <Link
                         href={`/admin/${slug}/work/${request.id}`}
-                        style={{
-                          color: 'var(--text-primary)',
-                          textDecoration: 'none',
-                        }}
+                        className="c-link-reset"
                       >
                         {request.title}
                       </Link>
                     </td>
-                    <td style={{ color: 'var(--text-secondary)' }}>
-                      {request.category || '—'}
-                    </td>
+                    <td className="cell-sub">{request.category || '—'}</td>
                     <td>
                       <span
                         className={`c-badge ${
@@ -247,7 +215,7 @@ export default function WorkPage({
                         {STATUS_LABEL[request.status] || request.status}
                       </span>
                     </td>
-                    <td style={{ color: 'var(--text-secondary)' }}>
+                    <td className="cell-sub">
                       {new Date(request.createdAt).toLocaleDateString('ko-KR')}
                     </td>
                   </tr>
@@ -257,6 +225,6 @@ export default function WorkPage({
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }
