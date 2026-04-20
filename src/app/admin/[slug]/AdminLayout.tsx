@@ -202,12 +202,12 @@ export default function AdminLayout({
                     </span>
                   </div>
                   <Link
-                    href={`/admin/${slug}/dashboard`}
+                    href={`/admin/${slug}/member-info`}
                     className="topnav-popup-item"
                     onClick={() => setProfileOpen(false)}
                   >
-                    <span className="material-symbols-rounded">dashboard</span>
-                    대시보드
+                    <span className="material-symbols-rounded">person</span>
+                    회원정보
                   </Link>
                   <a
                     href={`/admin/login/${slug}`}
