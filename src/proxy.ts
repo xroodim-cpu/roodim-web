@@ -22,7 +22,9 @@ const MAIN_DOMAINS = [
 
 export async function proxy(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
-  const hostWithoutPort = hostname.split(':')[0];
+  const hostWithoutPortRaw = hostname.split(':')[0];
+  // www.* → apex 매핑. sites.custom_domain 에는 보통 apex 만 저장되므로 lookup 시 normalize.
+  const hostWithoutPort = hostWithoutPortRaw.replace(/^www\./, '');
   const { pathname } = request.nextUrl;
 
   // Skip for admin, api, static paths
