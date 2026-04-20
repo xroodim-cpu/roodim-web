@@ -202,24 +202,32 @@ export async function renderSiteFile(
   if (ogDesc && !/<meta[^>]*property=["']og:description/i.test(html)) {
     headInjection += `\n    <meta property="og:description" content="${ogDesc}">`;
   }
+  // og:image — 핵심. 누락 시만 추가.
   if (ogImage && !/<meta[^>]*property=["']og:image["']/i.test(html)) {
     headInjection += `\n    <meta property="og:image" content="${ogImage}">`;
+  }
+  // og:image dimensions/alt — 독립 체크 (og:image 만 있고 dimensions 누락한 경우 보강)
+  if (ogImage && !/<meta[^>]*property=["']og:image:width/i.test(html)) {
     headInjection += `\n    <meta property="og:image:width" content="1200">`;
+  }
+  if (ogImage && !/<meta[^>]*property=["']og:image:height/i.test(html)) {
     headInjection += `\n    <meta property="og:image:height" content="630">`;
+  }
+  if (ogImage && ogTitle && !/<meta[^>]*property=["']og:image:alt/i.test(html)) {
     headInjection += `\n    <meta property="og:image:alt" content="${ogTitle}">`;
-    // Twitter Cards — 카카오톡 일부도 twitter:card 우선 사용
-    if (!/<meta[^>]*name=["']twitter:card/i.test(html)) {
-      headInjection += `\n    <meta name="twitter:card" content="summary_large_image">`;
-    }
-    if (!/<meta[^>]*name=["']twitter:image/i.test(html)) {
-      headInjection += `\n    <meta name="twitter:image" content="${ogImage}">`;
-    }
-    if (ogTitle && !/<meta[^>]*name=["']twitter:title/i.test(html)) {
-      headInjection += `\n    <meta name="twitter:title" content="${ogTitle}">`;
-    }
-    if (ogDesc && !/<meta[^>]*name=["']twitter:description/i.test(html)) {
-      headInjection += `\n    <meta name="twitter:description" content="${ogDesc}">`;
-    }
+  }
+  // Twitter Cards — 카카오톡 일부도 twitter:card 우선 사용
+  if (ogImage && !/<meta[^>]*name=["']twitter:card/i.test(html)) {
+    headInjection += `\n    <meta name="twitter:card" content="summary_large_image">`;
+  }
+  if (ogImage && !/<meta[^>]*name=["']twitter:image/i.test(html)) {
+    headInjection += `\n    <meta name="twitter:image" content="${ogImage}">`;
+  }
+  if (ogTitle && !/<meta[^>]*name=["']twitter:title/i.test(html)) {
+    headInjection += `\n    <meta name="twitter:title" content="${ogTitle}">`;
+  }
+  if (ogDesc && !/<meta[^>]*name=["']twitter:description/i.test(html)) {
+    headInjection += `\n    <meta name="twitter:description" content="${ogDesc}">`;
   }
   // og:url — 카카오톡 OG 이미지 노출 필수
   if (!/<meta[^>]*property=["']og:url/i.test(html)) {
