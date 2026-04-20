@@ -39,16 +39,26 @@ export async function proxy(request: NextRequest) {
 
   // ===== 커스텀 도메인 처리 =====
   if (!isMainDomain) {
+    // pathname 에 이미 슬러그 prefix 가 있으면 제거 (template-engine 이 <base href="/{slug}/">
+    // 주입하기 때문에 브라우저가 자체 도메인에 /{slug}/style.css 같은 절대 경로로 요청해 옴.
+    // 이걸 그대로 /api/site-render/{slug}{pathname} 에 붙이면 슬러그가 이중으로 들어가 404.)
+    const stripSlugPrefix = (slug: string, p: string): string => {
+      if (p === `/${slug}` || p === `/${slug}/`) return '';
+      if (p.startsWith(`/${slug}/`)) return p.substring(`/${slug}`.length);
+      return p;
+    };
+
     const cached = domainCache.get(hostWithoutPort);
     if (cached && cached.expires > Date.now()) {
+      const cleanPath = stripSlugPrefix(cached.slug, pathname);
       // standalone 또는 커스텀 스킨 사용 시 API 라우트로 rewrite
       if (cached.useSkinRender) {
         const url = request.nextUrl.clone();
-        url.pathname = `/api/site-render/${cached.slug}${pathname === '/' ? '' : pathname}`;
+        url.pathname = `/api/site-render/${cached.slug}${cleanPath === '/' ? '' : cleanPath}`;
         return NextResponse.rewrite(url);
       }
       const url = request.nextUrl.clone();
-      url.pathname = `/${cached.slug}${pathname}`;
+      url.pathname = `/${cached.slug}${cleanPath}`;
       return NextResponse.rewrite(url);
     }
 
@@ -74,13 +84,14 @@ export async function proxy(request: NextRequest) {
         const useSkinRender = siteType === 'standalone' || skinId != null;
         domainCache.set(hostWithoutPort, { slug, siteType, useSkinRender, expires: Date.now() + CACHE_TTL });
 
+        const cleanPath = stripSlugPrefix(slug, pathname);
         if (useSkinRender) {
           const url = request.nextUrl.clone();
-          url.pathname = `/api/site-render/${slug}${pathname === '/' ? '' : pathname}`;
+          url.pathname = `/api/site-render/${slug}${cleanPath === '/' ? '' : cleanPath}`;
           return NextResponse.rewrite(url);
         }
         const url = request.nextUrl.clone();
-        url.pathname = `/${slug}${pathname}`;
+        url.pathname = `/${slug}${cleanPath}`;
         return NextResponse.rewrite(url);
       }
     } catch (err) {
