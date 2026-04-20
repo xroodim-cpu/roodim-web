@@ -171,6 +171,17 @@ export async function renderSiteFile(
   const ogDesc = seoConfig.og_description || metaDesc;
   const ogImage = resolveAssetUrl(seoConfig.og_image || '');
   const faviconUrl = resolveAssetUrl(seoConfig.favicon_url || '');
+  // og:url — 카카오톡/페이스북 OG 이미지 노출에 필수. custom_domain 있으면 그쪽, 없으면 vercel default.
+  // siteRow lookup 으로 custom_domain 가져옴.
+  const siteRow = await db.select({ customDomain: sites.customDomain })
+    .from(sites)
+    .where(eq(sites.id, siteId))
+    .limit(1);
+  const customDomain = (siteRow[0]?.customDomain || '').trim();
+  const ogUrl = customDomain
+    ? `https://${customDomain}/`
+    : `https://roodim-web.vercel.app/${slug}/`;
+  const ogSiteName = baseConfig.site_name || baseConfig.title || ogTitle;
 
   if (metaTitle && !/<title[^>]*>/i.test(html)) {
     headInjection += `\n    <title>${metaTitle}</title>`;
@@ -191,8 +202,31 @@ export async function renderSiteFile(
   if (ogDesc && !/<meta[^>]*property=["']og:description/i.test(html)) {
     headInjection += `\n    <meta property="og:description" content="${ogDesc}">`;
   }
-  if (ogImage && !/<meta[^>]*property=["']og:image/i.test(html)) {
+  if (ogImage && !/<meta[^>]*property=["']og:image["']/i.test(html)) {
     headInjection += `\n    <meta property="og:image" content="${ogImage}">`;
+    headInjection += `\n    <meta property="og:image:width" content="1200">`;
+    headInjection += `\n    <meta property="og:image:height" content="630">`;
+    headInjection += `\n    <meta property="og:image:alt" content="${ogTitle}">`;
+    // Twitter Cards — 카카오톡 일부도 twitter:card 우선 사용
+    if (!/<meta[^>]*name=["']twitter:card/i.test(html)) {
+      headInjection += `\n    <meta name="twitter:card" content="summary_large_image">`;
+    }
+    if (!/<meta[^>]*name=["']twitter:image/i.test(html)) {
+      headInjection += `\n    <meta name="twitter:image" content="${ogImage}">`;
+    }
+    if (ogTitle && !/<meta[^>]*name=["']twitter:title/i.test(html)) {
+      headInjection += `\n    <meta name="twitter:title" content="${ogTitle}">`;
+    }
+    if (ogDesc && !/<meta[^>]*name=["']twitter:description/i.test(html)) {
+      headInjection += `\n    <meta name="twitter:description" content="${ogDesc}">`;
+    }
+  }
+  // og:url — 카카오톡 OG 이미지 노출 필수
+  if (!/<meta[^>]*property=["']og:url/i.test(html)) {
+    headInjection += `\n    <meta property="og:url" content="${ogUrl}">`;
+  }
+  if (ogSiteName && !/<meta[^>]*property=["']og:site_name/i.test(html)) {
+    headInjection += `\n    <meta property="og:site_name" content="${ogSiteName}">`;
   }
   if (faviconUrl && !/<link[^>]*rel=["'](?:icon|shortcut icon)/i.test(html)) {
     headInjection += `\n    <link rel="icon" href="${faviconUrl}">`;
