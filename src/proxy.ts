@@ -37,6 +37,17 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // roodim.com apex 는 org-1 회원사이트로 매핑되므로, 어드민 로그인/로그아웃
+  // 진입점은 link.roodim.com 으로 308 로 보내준다. POST /logout 도 보존.
+  if (
+    hostWithoutPort === 'roodim.com' &&
+    (pathname === '/login' || pathname === '/logout' || pathname.startsWith('/login/'))
+  ) {
+    const target = new URL(pathname, 'https://link.roodim.com');
+    target.search = request.nextUrl.search;
+    return NextResponse.redirect(target, 308);
+  }
+
   const isMainDomain = MAIN_DOMAINS.some(d => hostWithoutPort === d) || hostWithoutPort.endsWith('.vercel.app');
 
   // ===== 커스텀 도메인 처리 =====
