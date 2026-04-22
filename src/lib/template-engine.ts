@@ -897,6 +897,44 @@ ${rooInquiryScript(slug)}
     }
   }
 
+  // ── portfolio_loop (포트폴리오 게시판 — 컨펌 완료 작업 자료 노출) ──
+  // 마커: <!--@portfolio_loop-->...<!--@end_portfolio_loop-->
+  // 템플릿 변수: {#title}, {#thumb}, {#category}, {#excerpt}, {#link}, {#num}
+  const portfolioLoopRegex = /<!--@portfolio_loop-->([\s\S]*?)<!--@end_portfolio_loop-->/g;
+  const portfolioMatch = portfolioLoopRegex.exec(html);
+  if (portfolioMatch) {
+    const [fullMatch, template] = portfolioMatch;
+    try {
+      const portfolioApiPath = isPartner && orgId
+        ? `/api/bridge/bulletins/portfolio/posts?org_id=${orgId}&limit=12`
+        : `/api/sites/${encodeURIComponent(slug)}/bulletins/portfolio/posts?limit=12`;
+      const result = await adminApi<{ ok: boolean; posts?: Array<{ id: number; title: string; content: string; excerpt?: string; thumbnail_url?: string; category?: string; created_label: string }> }>(
+        'GET', portfolioApiPath
+      );
+      const posts = result.ok && result.data?.posts ? result.data.posts : [];
+      if (posts.length > 0) {
+        const rendered = posts.map((post, idx) => {
+          const thumbHtml = post.thumbnail_url
+            ? `<img src="${escapeHtmlTpl(post.thumbnail_url)}" alt="${escapeHtmlTpl(post.title || '')}" loading="lazy">`
+            : '';
+          const excerpt = post.excerpt || (post.content ? post.content.replace(/<[^>]+>/g, '').slice(0, 120) : '');
+          return template
+            .replace(/\{#title\}/g, escapeHtmlTpl(post.title || ''))
+            .replace(/\{#thumb\}/g, thumbHtml)
+            .replace(/\{#category\}/g, escapeHtmlTpl(post.category || ''))
+            .replace(/\{#excerpt\}/g, escapeHtmlTpl(excerpt))
+            .replace(/\{#link\}/g, `/${slug}/portfolio/${post.id}`)
+            .replace(/\{#num\}/g, String(idx + 1));
+        }).join('\n');
+        html = html.replace(fullMatch, rendered);
+      } else {
+        html = html.replace(fullMatch, '<!-- no portfolio data -->');
+      }
+    } catch {
+      html = html.replace(fullMatch, '<!-- portfolio load failed -->');
+    }
+  }
+
   // ── qna_loop ──
   // 항상 roodim-web DB(boards.systemKey='qna')를 먼저 조회.
   // 로컬 데이터 없고 partner 사이트일 때만 Bridge API 폴백.

@@ -25,9 +25,9 @@ interface TopMenu {
   subMenus?: SubMenu[];
 }
 
-// 고객 어드민 5대 핵심 메뉴 — 루딤링크 상단 네비와 동일 구조 (아이콘 + 텍스트)
+// 고객 어드민 핵심 메뉴 — 루딤링크 상단 네비와 동일 구조 (아이콘 + 텍스트)
+// 대시보드는 메뉴에서 제거 — 회원정보(프로필 드롭다운)에서 모든 정보 확인
 const TOP_MENUS: TopMenu[] = [
-  { key: 'dashboard', label: '대시보드', href: '/dashboard', icon: 'dashboard' },
   { key: 'reservations', label: '예약', href: '/reservations', icon: 'event_note' },
   {
     key: 'work',
@@ -117,8 +117,8 @@ export default function AdminLayout({
             </button>
           )}
 
-          {/* 브랜드 로고 + 사이트명 */}
-          <Link href={`/admin/${slug}/dashboard`} className="topnav-brand">
+          {/* 브랜드 로고 + 사이트명 → 회원정보로 이동 (대시보드 제거됨) */}
+          <Link href={`/admin/${slug}/member-info`} className="topnav-brand">
             <span
               className="topnav-brand-text"
               style={{
