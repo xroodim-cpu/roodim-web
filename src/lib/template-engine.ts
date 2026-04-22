@@ -340,6 +340,15 @@ async function applyVariables(ctx: TemplateContext, html: string): Promise<strin
 
   const ownerMeta = (ownerProfile[0]?.metaJson || {}) as Record<string, string>;
 
+  // 브랜드 온도 — 사이트 디자인 톤(warm/cool/neutral). data.json 또는 design config 에서 로드.
+  const brandTemperature = (design.brand_temperature || base.brand_temperature || 'warm').toString();
+  const brandTemperatureLabel = ({
+    warm: '따뜻한',
+    cool: '시원한',
+    neutral: '중립적인',
+    bold: '강렬한',
+  } as Record<string, string>)[brandTemperature] || brandTemperature;
+
   const variables: Record<string, string> = {
     // 기본 치환코드
     'COMPANY_NAME': base.site_name || base.company_name || '',
@@ -347,6 +356,9 @@ async function applyVariables(ctx: TemplateContext, html: string): Promise<strin
     'PHONE': base.phone || headerfooter.phone || '',
     'EMAIL': base.email || headerfooter.email || '',
     'ADDRESS': base.address || headerfooter.address || '',
+    // 브랜드 온도 (구 시즈닝데이 → 브랜드온도)
+    'BRAND_TEMPERATURE': brandTemperature,
+    'BRAND_TEMPERATURE_LABEL': brandTemperatureLabel,
     // 자산 URL: /storage/... 레거시 경로는 ADMIN_API_URL 로 정규화 (Laravel 서버로 직행)
     'LOGO_URL': resolveAssetUrl(base.logo_url || headerfooter.logo_url || design.logo_url || ''),
     'BUSINESS_NUMBER': base.business_number || headerfooter.business_number || '',
