@@ -101,10 +101,12 @@ export async function getSiteFileList(siteId: string) {
 /**
  * 사이트의 특정 파일 조회 (site_files 우선, 없으면 web_skin_files fallback)
  *
+ * previewSkinId 가 주어지면 사이트의 skin_id 대신 그 스킨의 파일을 fallback 으로 사용 (미리보기).
+ *
  * 성능: site_files + sites + web_skin_files 를 단일 LEFT JOIN 으로 합쳐
  * 1회 왕복에 해결. 이전 구현은 순차 3쿼리였음.
  */
-export async function getSiteFile(siteId: string, filename: string) {
+export async function getSiteFile(siteId: string, filename: string, previewSkinId?: number) {
   const rows = await db.execute(sqlRaw`
     SELECT
       COALESCE(sf.id, wsf.id) AS id,
@@ -123,7 +125,7 @@ export async function getSiteFile(siteId: string, filename: string) {
     LEFT JOIN site_files sf
       ON sf.site_id = s.id AND sf.filename = ${filename}
     LEFT JOIN web_skin_files wsf
-      ON wsf.skin_id = s.skin_id AND wsf.filename = ${filename}
+      ON wsf.skin_id = COALESCE(${previewSkinId ?? null}::int, s.skin_id) AND wsf.filename = ${filename}
     WHERE s.id = ${siteId}
     LIMIT 1
   `);
@@ -161,8 +163,9 @@ export async function getSiteFileById(fileId: number) {
 
 /**
  * 사이트의 파일 내용 조회 (template-engine용 - site_files 우선, skin fallback)
+ * previewSkinId 지정 시 해당 스킨 파일을 fallback 으로 사용
  */
-export async function getFileContent(siteId: string, filename: string): Promise<string | null> {
-  const file = await getSiteFile(siteId, filename);
+export async function getFileContent(siteId: string, filename: string, previewSkinId?: number): Promise<string | null> {
+  const file = await getSiteFile(siteId, filename, previewSkinId);
   return file?.content || null;
 }

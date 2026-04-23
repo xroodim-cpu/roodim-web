@@ -39,14 +39,17 @@ function resolveAssetUrl(value: string | null | undefined): string {
  * 1. include 처리
  * 2. 직원 루프 처리
  * 3. 치환코드 적용
+ *
+ * previewSkinId 가 주어지면 사이트의 skin_id 대신 그 스킨의 파일을 사용 (어드민 미리보기 용도).
  */
 export async function renderSiteFile(
   siteId: string,
   slug: string,
-  filename: string
+  filename: string,
+  previewSkinId?: number
 ): Promise<string | null> {
   // 파일 로드 (site_files 우선, 없으면 web_skin_files fallback)
-  const content = await getFileContent(siteId, filename);
+  const content = await getFileContent(siteId, filename, previewSkinId);
   if (!content) return null;
 
   // 설정 로드
@@ -73,7 +76,7 @@ export async function renderSiteFile(
     .replace(/<!--@footer-->/g, '<!--@include("footer.html")-->');
 
   // 1. include 처리 (최대 3 depth)
-  html = await processIncludes(siteId, html, 0);
+  html = await processIncludes(siteId, html, 0, previewSkinId);
 
   // 2. 직원 루프 처리
   html = await processStaffLoop(siteId, html);
@@ -153,7 +156,7 @@ export async function renderSiteFile(
     headInjection += `\n    <base href="/${slug}/">`;
   }
   if (!alreadyLinksLocalCss) {
-    const cssFile = await getFileContent(siteId, 'style.css');
+    const cssFile = await getFileContent(siteId, 'style.css', previewSkinId);
     if (cssFile) {
       headInjection += `\n    <link rel="stylesheet" href="style.css">`;
     }
@@ -249,8 +252,9 @@ export async function renderSiteFile(
 
 /**
  * <!--@include("filename.html")--> 처리
+ * previewSkinId 가 있으면 includes 도 그 스킨에서 가져옴.
  */
-async function processIncludes(siteId: string, html: string, depth: number): Promise<string> {
+async function processIncludes(siteId: string, html: string, depth: number, previewSkinId?: number): Promise<string> {
   if (depth >= 3) return html;
 
   const includeRegex = /<!--@include\("([^"]+)"\)-->/g;
@@ -259,10 +263,10 @@ async function processIncludes(siteId: string, html: string, depth: number): Pro
   for (const match of matches) {
     const [fullMatch, includeFilename] = match;
     // site_files 우선, 없으면 web_skin_files fallback
-    const fileContent = await getFileContent(siteId, includeFilename);
+    const fileContent = await getFileContent(siteId, includeFilename, previewSkinId);
 
     let replacement = fileContent || `<!-- include not found: ${includeFilename} -->`;
-    replacement = await processIncludes(siteId, replacement, depth + 1);
+    replacement = await processIncludes(siteId, replacement, depth + 1, previewSkinId);
     html = html.replace(fullMatch, replacement);
   }
 

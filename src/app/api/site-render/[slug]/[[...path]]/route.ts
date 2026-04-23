@@ -22,6 +22,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return new NextResponse('Not Found', { status: 404 });
   }
 
+  // 어드민 미리보기 — ?preview_skin=N 으로 적용중 스킨 대신 해당 스킨 파일 렌더링
+  const previewSkinIdRaw = request.nextUrl.searchParams.get('preview_skin');
+  const previewSkinId = previewSkinIdRaw ? parseInt(previewSkinIdRaw, 10) : undefined;
+  const previewSkinIdSafe = previewSkinId && Number.isFinite(previewSkinId) ? previewSkinId : undefined;
+
   // 파일명 결정
   let filename: string;
   if (!pathStr) {
@@ -35,7 +40,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 
   // 파일 조회
-  const file = await getSiteFile(site.id, filename);
+  const file = await getSiteFile(site.id, filename, previewSkinIdSafe);
   if (!file) {
     // Vercel 로그에서 누락 추적
     console.warn('[site-render][404]', { slug, siteId: site.id, filename });
@@ -65,7 +70,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   // HTML 파일 — 템플릿 엔진으로 렌더링
   if (file.fileType === 'html') {
-    const rendered = await renderSiteFile(site.id, slug, filename);
+    const rendered = await renderSiteFile(site.id, slug, filename, previewSkinIdSafe);
     if (!rendered) {
       return new NextResponse('Render Error', { status: 500 });
     }
@@ -73,7 +78,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return new NextResponse(rendered, {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'public, max-age=60, s-maxage=120',
+        // 미리보기는 캐시하지 않음 — 스킨 변경 즉시 반영
+        'Cache-Control': previewSkinIdSafe
+          ? 'no-store'
+          : 'public, max-age=60, s-maxage=120',
       },
     });
   }
