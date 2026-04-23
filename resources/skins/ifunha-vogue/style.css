@@ -40,18 +40,30 @@ ul { list-style: none; }
 }
 
 /* ----- Empty-state: 데이터 없는 banner area 숨기기 -----
-   template-engine 이 빈 banner area 에 `data-empty="1"` 마커를 주입한다.
-   Hero 는 예외적으로 그라디언트 fallback 유지. */
-.roo-banner-area:not(.hero-slides):has([data-empty="1"]) { display: none; }
-.hero-slides:has([data-empty="1"]) {
-  background: linear-gradient(135deg, #B8A490 0%, #2A2520 100%);
+   template-engine 이 빈 <div class="roo-banner-area"> area 에 `data-empty="1"` 을 주입한다.
+   template-engine 정규식이 <div>만 매칭하므로 모든 area 는 div 래퍼로 감싼다. */
+
+/* hero: inner area 는 숨기고 section 자체는 유지, 배경만 fallback 그라디언트 */
+.hero:has(.roo-banner-area[data-empty="1"]) {
+  background: linear-gradient(135deg, #5E4E44 0%, #2A2520 100%);
 }
-.hero-slides:has([data-empty="1"])::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.45) 100%);
-}
+.hero .roo-banner-area[data-empty="1"] { display: none; }
+
+/* models / process / packages: 빈 area 면 섹션 통째 숨김 */
+.models-section:has(.roo-banner-area[data-empty="1"]),
+.process:has(.roo-banner-area[data-empty="1"]),
+.packages:has(.roo-banner-area[data-empty="1"]) { display: none; }
+
+/* cinematic: div 자체가 area */
+.cinematic.roo-banner-area[data-empty="1"] { display: none; }
+
+/* faq head area: head 만 숨기고 faq-wrap 은 유지 */
+.faq .roo-banner-area[data-empty="1"] { display: none; }
+
+/* video-strips (portfolio): 데이터 없으면 섹션 숨김, 있으면 블록 표시 */
+.video-strips { display: none; }
+.video-strips:has(a.v-card) { display: block; }
+
 .roo-empty { display: none !important; }
 
 /* ============================================
@@ -592,9 +604,11 @@ ul { list-style: none; }
   filter: drop-shadow(0 8px 32px rgba(0,0,0,0.3));
 }
 
-.scene-1 .scene-bg { background: linear-gradient(135deg, #B8A490 0%, #5E4E44 100%); }
-.scene-2 .scene-bg { background: linear-gradient(135deg, #2A2520 0%, #8B2E2E 100%); }
-.scene-3 .scene-bg { background: linear-gradient(135deg, #D4C4AE 0%, #8B7561 100%); }
+/* scene 배경 동적 — 배너 수에 맞춰 3가지 톤 순환 */
+.cinematic .scene:nth-of-type(3n+1) .scene-bg { background-color: #5E4E44; }
+.cinematic .scene:nth-of-type(3n+2) .scene-bg { background-color: #2A2520; }
+.cinematic .scene:nth-of-type(3n+3) .scene-bg { background-color: #8B7561; }
+/* 배경 이미지가 style 로 지정되면 color 위에 덮임 */
 
 .scene-content {
   position: fixed;
@@ -1273,83 +1287,6 @@ ul { list-style: none; }
   .faq-q-text { gap: 12px; }
   .faq-num { min-width: 24px; font-size: 10px; }
   .faq-a-inner { padding: 0 4px 24px 36px; font-size: 14px; }
-}
-
-/* ============================================
-   CONTACT
-============================================ */
-.contact {
-  padding: var(--gap-section) 0;
-  background: var(--c-paper);
-  text-align: center;
-  border-top: 1px solid var(--c-line);
-}
-
-.contact-inner { max-width: 800px; margin: 0 auto; }
-
-.contact-label {
-  font-family: var(--f-body);
-  font-size: 11px;
-  letter-spacing: 4px;
-  text-transform: uppercase;
-  color: var(--c-accent);
-  margin-bottom: 16px;
-  font-weight: 600;
-}
-
-.contact-title {
-  font-family: var(--f-display);
-  font-size: clamp(48px, 7vw, 100px);
-  line-height: 0.95;
-  text-transform: uppercase;
-  font-weight: 400;
-  margin-bottom: 30px;
-}
-
-.contact-desc {
-  font-size: clamp(16px, 1.6vw, 19px);
-  color: var(--c-ink-soft);
-  max-width: 560px;
-  margin: 0 auto 40px;
-}
-
-.contact-btns {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-bottom: 50px;
-}
-
-.contact-info {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 40px;
-  padding-top: 40px;
-  border-top: 1px solid var(--c-line);
-  text-align: left;
-}
-
-.info-item .label {
-  font-family: var(--f-body);
-  font-size: 10px;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: var(--c-ink-soft);
-  margin-bottom: 8px;
-  font-weight: 600;
-}
-
-.info-item .value {
-  font-family: var(--f-display);
-  font-size: 20px;
-  text-transform: uppercase;
-  font-weight: 400;
-  word-break: break-word;
-}
-
-@media (max-width: 700px) {
-  .contact-info { grid-template-columns: 1fr; gap: 20px; text-align: center; }
 }
 
 /* ============================================

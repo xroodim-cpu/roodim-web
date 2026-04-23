@@ -15,78 +15,51 @@
 </head>
 <body>
 
-<!-- ============ 1. HERO ============ -->
+<!-- ============ 1. HERO (area_id="hero") ============ -->
 <section class="hero" id="hero">
+  <div class="hero-area roo-banner-area" area_id="hero">
+    <div class="hero-slides">
+      <!--@banner_loop-->
+      <div class="hero-slide" data-idx="{#num}">
+        <div class="media">{#img_or_video}</div>
 
-  <div class="hero-slides roo-banner-area" area_id="hero">
-    <!--@banner_loop-->
-    <div class="hero-slide" data-idx="{#num}">
-      <div class="media">
-        <img src="{#img}" alt="{#title}"
-             onerror="this.parentNode.style.background='linear-gradient(135deg,#5E4E44 0%,#2A2520 100%)';this.remove()"
-             style="width:100%;height:100%;object-fit:cover;">
-      </div>
-    </div>
-    <!--@end_banner_loop-->
-  </div>
+        <!-- 좌측 카피: text_1, text_2, text_3 (위→아래) -->
+        <div class="hero-side left">
+          <div class="side-line">
+            <div class="side-copy pos-1 is-visible">
+              <span class="label">Story</span>
+              <span class="headline">{#text_1}</span>
+            </div>
+            <div class="side-copy pos-2 is-visible">
+              <span class="label">Feature</span>
+              <span class="headline">{#text_2}</span>
+            </div>
+            <div class="side-copy pos-3 is-visible">
+              <span class="label">Inside</span>
+              <span class="headline">{#text_3}</span>
+            </div>
+          </div>
+        </div>
 
-  <!-- 좌측 카피 (정적 매거진 카피, 사이트명 치환) -->
-  <div class="hero-side left">
-    <div class="side-line">
-      <div class="side-copy pos-1 is-visible" data-set="0">
-        <span class="label">Cover Story</span>
-        <span class="headline">CREATIVE<br>STORIES<br><span class="accent">UNFOLD</span></span>
+        <!-- 우측 카피: text_4, text_5, text_6 (위→아래) -->
+        <div class="hero-side right">
+          <div class="side-line">
+            <div class="side-copy pos-1 is-visible">
+              <span class="label">Edition</span>
+              <span class="headline">{#text_4}</span>
+            </div>
+            <div class="side-copy pos-2 is-visible">
+              <span class="label">Special</span>
+              <span class="headline">{#text_5}</span>
+            </div>
+            <div class="side-copy pos-3 is-visible">
+              <span class="label">Archive</span>
+              <span class="headline">{#text_6}</span>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="side-copy pos-2 is-visible" data-set="0">
-        <span class="label">Featured</span>
-        <span class="headline">{{COMPANY_NAME}}<br><small>AI CREATIVE STUDIO</small></span>
-      </div>
-      <div class="side-copy pos-3 is-visible" data-set="0">
-        <span class="label">Inside</span>
-        <span class="headline">SPRING<br>EDITION<br><small>NEW WORKS</small></span>
-      </div>
-      <div class="side-copy pos-1" data-set="1">
-        <span class="label">Issue 02</span>
-        <span class="headline">BEAUTY<br>UNDER<br><span class="accent">LIGHT</span></span>
-      </div>
-      <div class="side-copy pos-2" data-set="1">
-        <span class="label">Editorial</span>
-        <span class="headline">AI MEETS<br>HUMAN<br><small>A NEW VISION</small></span>
-      </div>
-      <div class="side-copy pos-3" data-set="1">
-        <span class="label">Behind</span>
-        <span class="headline">FROM<br>SEOUL<br><small>TO THE WORLD</small></span>
-      </div>
-    </div>
-  </div>
-
-  <!-- 우측 카피 -->
-  <div class="hero-side right">
-    <div class="side-line">
-      <div class="side-copy pos-1 is-visible" data-set="0">
-        <span class="label">Featured</span>
-        <span class="headline">EVERY BRAND<br>AT LIGHT<br><span class="accent">SPEED</span></span>
-      </div>
-      <div class="side-copy pos-2 is-visible" data-set="0">
-        <span class="label">Spring</span>
-        <span class="headline">A NEW<br>ERA OF<br><span class="accent">CREATIVE</span></span>
-      </div>
-      <div class="side-copy pos-3 is-visible" data-set="0">
-        <span class="label">No. 247</span>
-        <span class="headline">THE AI<br>COVER<br><small>PROJECT</small></span>
-      </div>
-      <div class="side-copy pos-1" data-set="1">
-        <span class="label">Cover</span>
-        <span class="headline">FOR EVERY<br>STUDIO<br><span class="accent">LOVER</span></span>
-      </div>
-      <div class="side-copy pos-2" data-set="1">
-        <span class="label">Special</span>
-        <span class="headline">FORGED<br>LEATHER<br><small>STATUS BAGS</small></span>
-      </div>
-      <div class="side-copy pos-3" data-set="1">
-        <span class="label">Archive</span>
-        <span class="headline">100<br>YEARS OF<br><span class="accent">STYLE</span></span>
-      </div>
+      <!--@end_banner_loop-->
     </div>
   </div>
 
@@ -108,227 +81,122 @@
 <!-- ============ 2. NAV (header.html) ============ -->
 <!--@include("header.html")-->
 
-<!-- ============ 3. 영상 슬라이드 4줄 (정적 무한슬라이드) ============ -->
+<!-- ============ 3. PORTFOLIO STRIP (포트폴리오 게시판 무한슬라이드) ============ -->
 <section class="video-strips">
   <div class="v-strip v-strip-1">
     <div class="v-strip-track">
-      <div class="v-card ratio-9-16"><div class="v-content"><img src="https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400&q=80" alt=""><span class="v-label">Beauty · 9:16</span></div></div>
-      <div class="v-card ratio-16-9"><div class="v-content"><img src="https://images.unsplash.com/photo-1492707892479-7bc8d5a4ee93?w=640&q=80" alt=""><span class="v-label">Film · 16:9</span></div></div>
-      <div class="v-card ratio-4-5"><div class="v-content"><img src="https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400&q=80" alt=""><span class="v-label">Fashion · 4:5</span></div></div>
-      <div class="v-card ratio-1-1"><div class="v-content"><img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400&q=80" alt=""><span class="v-label">Square · 1:1</span></div></div>
-      <div class="v-card ratio-3-4"><div class="v-content"><img src="https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=400&q=80" alt=""><span class="v-label">Music · 3:4</span></div></div>
-      <div class="v-card ratio-21-9"><div class="v-content"><img src="https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=840&q=80" alt=""><span class="v-label">Cinema · 21:9</span></div></div>
-      <div class="v-card ratio-9-16"><div class="v-content"><img src="https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400&q=80" alt=""><span class="v-label">Beauty · 9:16</span></div></div>
-      <div class="v-card ratio-16-9"><div class="v-content"><img src="https://images.unsplash.com/photo-1492707892479-7bc8d5a4ee93?w=640&q=80" alt=""><span class="v-label">Film · 16:9</span></div></div>
-      <div class="v-card ratio-4-5"><div class="v-content"><img src="https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400&q=80" alt=""><span class="v-label">Fashion · 4:5</span></div></div>
-      <div class="v-card ratio-1-1"><div class="v-content"><img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400&q=80" alt=""><span class="v-label">Square · 1:1</span></div></div>
-      <div class="v-card ratio-3-4"><div class="v-content"><img src="https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=400&q=80" alt=""><span class="v-label">Music · 3:4</span></div></div>
-      <div class="v-card ratio-21-9"><div class="v-content"><img src="https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=840&q=80" alt=""><span class="v-label">Cinema · 21:9</span></div></div>
-    </div>
-  </div>
-
-  <div class="v-strip v-strip-2">
-    <div class="v-strip-track">
-      <div class="v-card ratio-16-9"><div class="v-content"><img src="https://images.unsplash.com/photo-1488161628813-04466f872be2?w=640&q=80" alt=""><span class="v-label">Luxury · 16:9</span></div></div>
-      <div class="v-card ratio-2-3"><div class="v-content"><img src="https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=400&q=80" alt=""><span class="v-label">Fashion · 2:3</span></div></div>
-      <div class="v-card ratio-9-16"><div class="v-content"><img src="https://images.unsplash.com/photo-1535295972055-1c762f4483e5?w=400&q=80" alt=""><span class="v-label">Reels · 9:16</span></div></div>
-      <div class="v-card ratio-1-1"><div class="v-content"><img src="https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&q=80" alt=""><span class="v-label">Jewelry · 1:1</span></div></div>
-      <div class="v-card ratio-21-9"><div class="v-content"><img src="https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=840&q=80" alt=""><span class="v-label">Wine · 21:9</span></div></div>
-      <div class="v-card ratio-4-5"><div class="v-content"><img src="https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&q=80" alt=""><span class="v-label">Teaser · 4:5</span></div></div>
-      <div class="v-card ratio-16-9"><div class="v-content"><img src="https://images.unsplash.com/photo-1488161628813-04466f872be2?w=640&q=80" alt=""><span class="v-label">Luxury · 16:9</span></div></div>
-      <div class="v-card ratio-2-3"><div class="v-content"><img src="https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=400&q=80" alt=""><span class="v-label">Fashion · 2:3</span></div></div>
-      <div class="v-card ratio-9-16"><div class="v-content"><img src="https://images.unsplash.com/photo-1535295972055-1c762f4483e5?w=400&q=80" alt=""><span class="v-label">Reels · 9:16</span></div></div>
-      <div class="v-card ratio-1-1"><div class="v-content"><img src="https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&q=80" alt=""><span class="v-label">Jewelry · 1:1</span></div></div>
-      <div class="v-card ratio-21-9"><div class="v-content"><img src="https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=840&q=80" alt=""><span class="v-label">Wine · 21:9</span></div></div>
-      <div class="v-card ratio-4-5"><div class="v-content"><img src="https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&q=80" alt=""><span class="v-label">Teaser · 4:5</span></div></div>
-    </div>
-  </div>
-
-  <div class="v-strip v-strip-3">
-    <div class="v-strip-track">
-      <div class="v-card ratio-1-1"><div class="v-content"><img src="https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=400&q=80" alt=""><span class="v-label">Editorial · 1:1</span></div></div>
-      <div class="v-card ratio-9-16"><div class="v-content"><img src="https://images.unsplash.com/photo-1522335789203-aaa75afae71f?w=400&q=80" alt=""><span class="v-label">Cosmetic · 9:16</span></div></div>
-      <div class="v-card ratio-3-4"><div class="v-content"><img src="https://images.unsplash.com/photo-1561070791-2526d30994b8?w=400&q=80" alt=""><span class="v-label">Art · 3:4</span></div></div>
-      <div class="v-card ratio-16-9"><div class="v-content"><img src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=640&q=80" alt=""><span class="v-label">Teaser · 16:9</span></div></div>
-      <div class="v-card ratio-4-5"><div class="v-content"><img src="https://images.unsplash.com/photo-1513694203232-719a280e022f?w=400&q=80" alt=""><span class="v-label">Home · 4:5</span></div></div>
-      <div class="v-card ratio-2-3"><div class="v-content"><img src="https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80" alt=""><span class="v-label">Bag · 2:3</span></div></div>
-      <div class="v-card ratio-1-1"><div class="v-content"><img src="https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=400&q=80" alt=""><span class="v-label">Editorial · 1:1</span></div></div>
-      <div class="v-card ratio-9-16"><div class="v-content"><img src="https://images.unsplash.com/photo-1522335789203-aaa75afae71f?w=400&q=80" alt=""><span class="v-label">Cosmetic · 9:16</span></div></div>
-      <div class="v-card ratio-3-4"><div class="v-content"><img src="https://images.unsplash.com/photo-1561070791-2526d30994b8?w=400&q=80" alt=""><span class="v-label">Art · 3:4</span></div></div>
-      <div class="v-card ratio-16-9"><div class="v-content"><img src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=640&q=80" alt=""><span class="v-label">Teaser · 16:9</span></div></div>
-      <div class="v-card ratio-4-5"><div class="v-content"><img src="https://images.unsplash.com/photo-1513694203232-719a280e022f?w=400&q=80" alt=""><span class="v-label">Home · 4:5</span></div></div>
-      <div class="v-card ratio-2-3"><div class="v-content"><img src="https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80" alt=""><span class="v-label">Bag · 2:3</span></div></div>
-    </div>
-  </div>
-
-  <div class="v-strip v-strip-4">
-    <div class="v-strip-track">
-      <div class="v-card ratio-5-4"><div class="v-content"><img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=640&q=80" alt=""><span class="v-label">Bold · 5:4</span></div></div>
-      <div class="v-card ratio-9-16"><div class="v-content"><img src="https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=400&q=80" alt=""><span class="v-label">Lipstick · 9:16</span></div></div>
-      <div class="v-card ratio-21-9"><div class="v-content"><img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=840&q=80" alt=""><span class="v-label">Wide · 21:9</span></div></div>
-      <div class="v-card ratio-3-4"><div class="v-content"><img src="https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400&q=80" alt=""><span class="v-label">Dessert · 3:4</span></div></div>
-      <div class="v-card ratio-1-1"><div class="v-content"><img src="https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400&q=80" alt=""><span class="v-label">Café · 1:1</span></div></div>
-      <div class="v-card ratio-16-9"><div class="v-content"><img src="https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=640&q=80" alt=""><span class="v-label">Studio · 16:9</span></div></div>
-      <div class="v-card ratio-5-4"><div class="v-content"><img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=640&q=80" alt=""><span class="v-label">Bold · 5:4</span></div></div>
-      <div class="v-card ratio-9-16"><div class="v-content"><img src="https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=400&q=80" alt=""><span class="v-label">Lipstick · 9:16</span></div></div>
-      <div class="v-card ratio-21-9"><div class="v-content"><img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=840&q=80" alt=""><span class="v-label">Wide · 21:9</span></div></div>
-      <div class="v-card ratio-3-4"><div class="v-content"><img src="https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400&q=80" alt=""><span class="v-label">Dessert · 3:4</span></div></div>
-      <div class="v-card ratio-1-1"><div class="v-content"><img src="https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400&q=80" alt=""><span class="v-label">Café · 1:1</span></div></div>
-      <div class="v-card ratio-16-9"><div class="v-content"><img src="https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=640&q=80" alt=""><span class="v-label">Studio · 16:9</span></div></div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ 4. CINEMATIC (정적 sticky scroll) ============ -->
-<div class="cinematic">
-  <section class="scene scene-1">
-    <div class="scene-sticky">
-      <div class="scene-bg" style="background-image: url('https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=1600&q=80'); background-size: cover; background-position: center;"></div>
-    </div>
-    <div class="scene-content" data-scene-idx="0">
-      <div class="scene-eyebrow">— Cover Project —</div>
-      <h2 class="scene-title">Beauty,<br>reimagined<br>with <span class="accent">AI.</span></h2>
-      <p class="scene-desc">10년의 광고 내공과 AI 기술을 결합해, 지금까지 본 적 없는 뷰티 비주얼을 만듭니다.</p>
-      <a href="#models" class="scene-btn">View AI Models →</a>
-    </div>
-  </section>
-
-  <section class="scene scene-2">
-    <div class="scene-sticky">
-      <div class="scene-bg" style="background-image: url('https://images.unsplash.com/photo-1492707892479-7bc8d5a4ee93?w=1600&q=80'); background-size: cover; background-position: center;"></div>
-    </div>
-    <div class="scene-content" data-scene-idx="1">
-      <div class="scene-eyebrow">— Motion &amp; Story —</div>
-      <h2 class="scene-title">Stories that<br><span class="accent">move people.</span></h2>
-      <p class="scene-desc">정지된 한 컷을 넘어, 살아 움직이는 브랜드 콘텐츠. 다양한 비율과 길이로 모든 채널에 최적화된 영상을 제공합니다.</p>
-      <a href="#portfolio" class="scene-btn">View Films →</a>
-    </div>
-  </section>
-
-  <section class="scene scene-3">
-    <div class="scene-sticky">
-      <div class="scene-bg" style="background-image: url('https://images.unsplash.com/photo-1488161628813-04466f872be2?w=1600&q=80'); background-size: cover; background-position: center;"></div>
-    </div>
-    <div class="scene-content" data-scene-idx="2">
-      <div class="scene-eyebrow">— Why {{COMPANY_NAME}} —</div>
-      <h2 class="scene-title">Where brands<br>meet their<br><span class="accent">future.</span></h2>
-      <p class="scene-desc">우리가 함께 만든 결과물이 증명합니다.</p>
-      <a href="#contact" class="scene-btn">Start Your Project →</a>
-    </div>
-  </section>
-</div>
-
-<!-- ============ AI MODELS (banner_loop) ============ -->
-<section class="models-section" id="models">
-  <div class="container">
-    <div class="section-head fade">
-      <span class="sec-label">— AI Model Collection —</span>
-      <h2 class="sec-title">DISTINCT<br><span class="accent">AI ARCHETYPES</span></h2>
-      <p class="sec-sub">브랜드의 톤에 맞는 모델을 선택하세요. 뷰티·패션·라이프스타일 등 각 영역에 최적화된 AI 모델을 제공합니다.</p>
-    </div>
-    <div class="models-grid roo-banner-area" area_id="ai_models">
-      <!--@banner_loop-->
-      <div class="model-card fade">
-        <div class="model-visual">
-          <div class="thumb">
-            <img src="{#img}" alt="{#title}" onerror="this.parentNode.parentNode.style.background='linear-gradient(135deg,#B8A490,#5E4E44)';this.remove()">
-          </div>
-          <span class="index">No. {#num}</span>
-          <span class="tag">{#displayType}</span>
-        </div>
-        <h3 class="model-title">{#title}</h3>
-        <div class="model-subtitle">{#text}</div>
-        <p class="model-desc">{#html}</p>
-      </div>
-      <!--@end_banner_loop-->
-    </div>
-  </div>
-</section>
-
-<!-- ============ PROCESS (정적 4단계) ============ -->
-<section class="process" id="process">
-  <div class="container">
-    <div class="section-head fade">
-      <span class="sec-label">— How We Work —</span>
-      <h2 class="sec-title">THE <span class="accent">CRAFT</span><br>OF MAKING</h2>
-      <p class="sec-sub">상담에서 납품까지, 투명한 4단계 프로세스.</p>
-    </div>
-    <div class="process-list">
-      <div class="process-step fade"><div class="num">01</div><h3 class="step-title">Brief</h3><p class="step-desc">브랜드의 톤, 타겟, 목표를 듣고 최적의 방향을 함께 찾아냅니다.</p></div>
-      <div class="process-step fade d1"><div class="num">02</div><h3 class="step-title">Concept</h3><p class="step-desc">2~3개의 시안으로 방향성을 확정합니다.</p></div>
-      <div class="process-step fade d2"><div class="num">03</div><h3 class="step-title">Production</h3><p class="step-desc">확정된 컨셉을 바탕으로 본제작이 진행됩니다.</p></div>
-      <div class="process-step fade d3"><div class="num">04</div><h3 class="step-title">Delivery</h3><p class="step-desc">최종 파일 전달 후에도 사후관리를 이어갑니다.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ PORTFOLIO (portfolio_loop — 게시판 연동) ============ -->
-<section class="portfolio" id="portfolio">
-  <div class="container">
-    <div class="pf-head">
-      <div class="left fade">
-        <span class="sec-label">— Project Archive —</span>
-        <h2 class="sec-title">SELECTED<br>WORKS</h2>
-      </div>
-      <div class="pf-filter fade d1">
-        <button class="filter-btn active" type="button">All</button>
-        <button class="filter-btn" type="button">Beauty</button>
-        <button class="filter-btn" type="button">Fashion</button>
-        <button class="filter-btn" type="button">Film</button>
-        <button class="filter-btn" type="button">Branding</button>
-      </div>
-    </div>
-    <div class="masonry">
       <!--@portfolio_loop-->
-      <a href="{#link}" class="masonry-item fade" data-num="{#num}">
-        <div class="m-thumb">{#thumb}</div>
-        <div class="m-info">
-          <div class="num">No. {#num}</div>
-          <h4>{#title}</h4>
-          <span class="meta">{#category}</span>
+      <a class="v-card ratio-3-4" href="{#link}">
+        <div class="v-content">
+          {#thumb}
+          <span class="v-label">{#category}</span>
         </div>
       </a>
       <!--@end_portfolio_loop-->
     </div>
-    <div class="pf-more fade">
-      <a href="#contact" class="btn">View Full Archive →</a>
+  </div>
+</section>
+
+<!-- ============ 4. CINEMATIC (area_id="cinematic") ============ -->
+<div class="cinematic roo-banner-area" area_id="cinematic">
+  <!--@banner_loop-->
+  <section class="scene" data-scene-idx="{#num}">
+    <div class="scene-sticky">
+      <div class="scene-bg" style="background-image: url('{#img}'); background-size: cover; background-position: center;"></div>
+    </div>
+    <div class="scene-content" data-scene-idx="{#num}">
+      <div class="scene-eyebrow">— {#text_1} —</div>
+      <h2 class="scene-title">{#title}</h2>
+      <p class="scene-desc">{#text_2}</p>
+      <a href="{#link}" target="{#target}" class="scene-btn">{#text_3} →</a>
+    </div>
+  </section>
+  <!--@end_banner_loop-->
+</div>
+
+<!-- ============ 5. AI MODELS (area_id="ai_models") ============ -->
+<section class="models-section" id="models">
+  <div class="container">
+    <div class="roo-banner-area models-area" area_id="ai_models">
+      <div class="section-head fade">
+        <span class="sec-label">— AI Model Collection —</span>
+        <h2 class="sec-title">{#area_name}</h2>
+        <p class="sec-sub">{#area_desc}</p>
+      </div>
+      <div class="models-grid">
+        <!--@banner_loop-->
+        <div class="model-card fade">
+          <div class="model-visual">
+            <div class="thumb"><img src="{#img_1}" alt="{#title}" onerror="this.parentNode.parentNode.style.background='linear-gradient(135deg,#B8A490,#5E4E44)';this.remove()"></div>
+            <span class="index">No. {#num}</span>
+          </div>
+          <h3 class="model-title">{#title}</h3>
+          <p class="model-desc">{#text_1}</p>
+        </div>
+        <!--@end_banner_loop-->
+      </div>
     </div>
   </div>
 </section>
 
-<!-- ============ PACKAGES (banner_loop) ============ -->
+<!-- ============ 6. PROCESS / THE CRAFT (area_id="craft") ============ -->
+<section class="process" id="process">
+  <div class="container">
+    <div class="roo-banner-area process-area" area_id="craft">
+      <div class="section-head fade">
+        <span class="sec-label">— How We Work —</span>
+        <h2 class="sec-title">{#area_name}</h2>
+        <p class="sec-sub">{#area_desc}</p>
+      </div>
+      <div class="process-list">
+        <!--@banner_loop-->
+        <div class="process-step fade" data-step="{#num}">
+          <div class="num">{#num}</div>
+          <h3 class="step-title">{#title}</h3>
+          <p class="step-desc">{#text_1}</p>
+        </div>
+        <!--@end_banner_loop-->
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 7. PACKAGES (area_id="packages") ============ -->
 <section class="packages" id="packages">
   <div class="container">
-    <div class="section-head fade">
-      <span class="sec-label">— Pricing · Packages —</span>
-      <h2 class="sec-title">WAYS<br>TO WORK</h2>
-      <p class="sec-sub">예산과 목적에 맞춰 고를 수 있는 패키지.</p>
-    </div>
-    <div class="pkg-grid roo-banner-area" area_id="packages">
-      <!--@banner_loop-->
-      <div class="pkg-card fade" data-tier="{#num}">
-        <div class="pkg-num">No. {#num}</div>
-        <h3 class="pkg-name">{#title}</h3>
-        <div class="pkg-tagline">{#text}</div>
-        <div class="pkg-price">{#displayType}</div>
-        <div class="pkg-period"></div>
-        <div class="pkg-features">{#html}</div>
-        <a href="{#link}" target="{#target}" class="pkg-btn">문의하기 →</a>
+    <div class="roo-banner-area packages-area" area_id="packages">
+      <div class="section-head fade">
+        <span class="sec-label">— Pricing · Packages —</span>
+        <h2 class="sec-title">{#area_name}</h2>
+        <p class="sec-sub">{#area_desc}</p>
       </div>
-      <!--@end_banner_loop-->
+      <div class="pkg-grid">
+        <!--@banner_loop-->
+        <div class="pkg-card fade" data-tier="{#num}">
+          <div class="pkg-num">No. {#num}</div>
+          <h3 class="pkg-name">{#title}</h3>
+          <div class="pkg-tagline">{#text_1}</div>
+          <div class="pkg-price">{#text_2}</div>
+          <div class="pkg-period">{#text_3}</div>
+          <div class="pkg-features">{#html}</div>
+          <a href="{#link}" target="{#target}" class="pkg-btn">{#text_4}</a>
+        </div>
+        <!--@end_banner_loop-->
+      </div>
     </div>
   </div>
 </section>
 
-<!-- ============ FAQ (faq_loop — 게시판 연동) ============ -->
+<!-- ============ 8. FAQ / YOU ASKED (area_id="faq" head + faq_loop) ============ -->
 <section class="faq" id="faq">
   <div class="container">
-    <div class="section-head fade">
-      <span class="sec-label">— Frequently Asked —</span>
-      <h2 class="sec-title">YOU <span class="accent">ASKED,</span><br>WE ANSWERED</h2>
-      <p class="sec-sub">자주 묻는 질문들을 모았습니다. 더 궁금한 점이 있으시면 언제든 문의해주세요.</p>
+    <div class="roo-banner-area faq-area" area_id="faq">
+      <div class="section-head fade">
+        <span class="sec-label">— Frequently Asked —</span>
+        <h2 class="sec-title">{#area_name}</h2>
+        <p class="sec-sub">{#area_desc}</p>
+      </div>
     </div>
-
     <div class="faq-wrap fade d1">
       <!--@faq_loop-->
       <div class="faq-item" data-num="{#faq_num}">
@@ -344,26 +212,6 @@
         </div>
       </div>
       <!--@end_faq_loop-->
-    </div>
-  </div>
-</section>
-
-<!-- ============ CONTACT (정적 + 치환코드) ============ -->
-<section class="contact" id="contact">
-  <div class="container">
-    <div class="contact-inner">
-      <div class="contact-label fade">— Let's begin —</div>
-      <h2 class="contact-title fade d1">YOUR NEXT<br><span style="color:var(--c-accent);">STORY</span><br>STARTS HERE</h2>
-      <p class="contact-desc fade d2">무료 상담부터 시작해보세요. 아이디어·예산·일정을 편하게 말씀해주시면 24시간 내에 맞춤 제안서를 보내드립니다.</p>
-      <div class="contact-btns fade d3">
-        <a href="mailto:{{EMAIL}}" class="btn solid">프로젝트 문의하기</a>
-        <a href="tel:{{PHONE}}" class="btn">전화 상담 →</a>
-      </div>
-      <div class="contact-info">
-        <div class="info-item"><div class="label">Studio</div><div class="value">{{ADDRESS}}</div></div>
-        <div class="info-item"><div class="label">Email</div><div class="value">{{EMAIL}}</div></div>
-        <div class="info-item"><div class="label">Phone</div><div class="value">{{PHONE}}</div></div>
-      </div>
     </div>
   </div>
 </section>

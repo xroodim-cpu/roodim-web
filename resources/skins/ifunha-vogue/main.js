@@ -39,7 +39,6 @@
 
   var currentSlide = 0;
   var totalSlides = slides.length;
-  var copySetCount = 2;
 
   // ★ indicators 자동 생성 (banner_loop 슬라이드 수에 맞춤)
   if (indicatorsWrap && indicators.length === 0 && totalSlides > 0) {
@@ -57,44 +56,6 @@
     slides[0].classList.add('active');
   }
 
-  function transitionCopies(copyListSelector, targetSetIdx) {
-    var copyList = document.querySelectorAll(copyListSelector);
-
-    copyList.forEach(function(c) {
-      c.classList.remove('is-entering');
-
-      if (c.classList.contains('is-visible')) {
-        c.classList.remove('is-visible');
-        c.classList.add('is-exiting');
-
-        setTimeout(function() {
-          c.classList.remove('is-exiting');
-        }, FADE_OUT);
-      }
-    });
-
-    setTimeout(function() {
-      copyList.forEach(function(c) {
-        var isTarget = parseInt(c.dataset.set) === targetSetIdx;
-        if (!isTarget) return;
-
-        var parent = c.parentNode;
-        var clone = c.cloneNode(true);
-        clone.classList.remove('is-visible', 'is-exiting', 'is-entering');
-        parent.replaceChild(clone, c);
-
-        requestAnimationFrame(function() {
-          clone.classList.add('is-entering');
-
-          setTimeout(function() {
-            clone.classList.remove('is-entering');
-            clone.classList.add('is-visible');
-          }, FADE_IN);
-        });
-      });
-    }, FADE_OUT);
-  }
-
   function showSlide(idx) {
     for (var i = 0; i < slides.length; i++) {
       if (i === idx) slides[i].classList.add('active');
@@ -105,10 +66,6 @@
       if (j === idx) indicators[j].classList.add('active');
       else indicators[j].classList.remove('active');
     }
-
-    var setIdx = idx % copySetCount;
-    transitionCopies('.hero-side.left .side-copy', setIdx);
-    transitionCopies('.hero-side.right .side-copy', setIdx);
   }
 
   var slideInterval = null;
