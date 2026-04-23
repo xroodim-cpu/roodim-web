@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "brand": {
+    "temperature": "neutral",
+    "tone": "에디토리얼 매거진 — 페이퍼 톤 + 와인 레드 액센트",
+    "colors": {
+      "paper":    "#F2EDE5",
+      "paper_2":  "#EBE4D6",
+      "ink":      "#1C1C1C",
+      "ink_soft": "#5C5249",
+      "line":     "#C9BFB0",
+      "accent":   "#8B2E2E"
+    },
+    "fonts": {
+      "display": "Anton, 'Noto Sans KR', sans-serif",
+      "body":    "Inter, 'Pretendard Variable', 'Pretendard', 'Noto Sans KR', sans-serif"
+    }
+  },
+  "category": "magazine-editorial",
+  "sections": {
+    "hero":      { "type": "banner_loop", "area_id": "hero" },
+    "ai_models": { "type": "banner_loop", "area_id": "ai_models" },
+    "packages":  { "type": "banner_loop", "area_id": "packages" },
+    "portfolio": { "type": "portfolio_loop" },
+    "faq":       { "type": "faq_loop" }
+  }
+}

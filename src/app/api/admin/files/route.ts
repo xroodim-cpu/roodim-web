@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { siteFiles, sites } from '@/drizzle/schema';
+import { siteFiles, sites, webSkins } from '@/drizzle/schema';
 import { eq, and, asc } from 'drizzle-orm';
 import { verifyAdminAccess } from '@/lib/admin-session';
 import { getAvailableVariables } from '@/lib/template-engine';
 
 /**
- * GET /api/admin/files?slug=X — 파일 목록 + 치환코드 목록
+ * GET /api/admin/files?slug=X — 파일 목록 + 치환코드 목록 + 적용 중인 스킨 메타
  */
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
@@ -31,10 +31,28 @@ export async function GET(req: NextRequest) {
     updatedAt: f.updatedAt,
   }));
 
+  // 현재 사이트에 적용된 스킨 메타 조회 (이름 인라인 편집용)
+  const [siteRow] = await db.select({ skinId: sites.skinId })
+    .from(sites)
+    .where(eq(sites.id, session.site_id))
+    .limit(1);
+
+  let skin: { id: number; slug: string; name: string; description: string | null } | null = null;
+  if (siteRow?.skinId) {
+    const [s] = await db.select({
+      id: webSkins.id,
+      slug: webSkins.slug,
+      name: webSkins.name,
+      description: webSkins.description,
+    }).from(webSkins).where(eq(webSkins.id, siteRow.skinId)).limit(1);
+    if (s) skin = s;
+  }
+
   return NextResponse.json({
     ok: true,
     files: fileList,
     variables: getAvailableVariables(),
+    skin,
   });
 }
 

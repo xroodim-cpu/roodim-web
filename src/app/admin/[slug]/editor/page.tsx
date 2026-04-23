@@ -18,6 +18,13 @@ interface Variable {
   category: string;
 }
 
+interface Skin {
+  id: number;
+  slug: string;
+  name: string;
+  description: string | null;
+}
+
 export default function EditorPage() {
   const [files, setFiles] = useState<SiteFile[]>([]);
   const [variables, setVariables] = useState<Variable[]>([]);
@@ -30,6 +37,9 @@ export default function EditorPage() {
   const [showNewFile, setShowNewFile] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showVars, setShowVars] = useState(false);
+  const [skin, setSkin] = useState<Skin | null>(null);
+  const [skinNameInput, setSkinNameInput] = useState('');
+  const [skinSaving, setSkinSaving] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const slug = typeof window !== 'undefined' ? window.location.pathname.split('/')[2] : '';
@@ -42,6 +52,10 @@ export default function EditorPage() {
       if (data.ok) {
         setFiles(data.files);
         setVariables(data.variables || []);
+        if (data.skin) {
+          setSkin(data.skin);
+          setSkinNameInput(data.skin.name);
+        }
         if (!activeFile && data.files.length > 0) {
           loadFileContent(data.files[0]);
         }
@@ -52,6 +66,40 @@ export default function EditorPage() {
       setLoading(false);
     }
   }, [slug]);
+
+  // 스킨 이름 저장
+  const saveSkinName = async () => {
+    if (!skin) return;
+    const trimmed = skinNameInput.trim();
+    if (trimmed.length === 0) {
+      setSkinNameInput(skin.name);
+      return;
+    }
+    if (trimmed === skin.name) return;
+
+    setSkinSaving(true);
+    try {
+      const res = await fetch(`/api/skins/${skin.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setSkin({ ...skin, name: data.skin.name });
+        setSkinNameInput(data.skin.name);
+      } else {
+        alert(`스킨 이름 저장 실패: ${data.error || '알 수 없는 오류'}`);
+        setSkinNameInput(skin.name);
+      }
+    } catch (e) {
+      console.error('Failed to save skin name:', e);
+      alert('스킨 이름 저장 중 오류');
+      setSkinNameInput(skin.name);
+    } finally {
+      setSkinSaving(false);
+    }
+  };
 
   // 파일 내용 로드
   const loadFileContent = async (file: SiteFile) => {
@@ -180,6 +228,40 @@ export default function EditorPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <a href={`/admin/${slug}`} style={{ color: '#888', fontSize: 13, textDecoration: 'none' }}>← 어드민</a>
           <span style={{ color: '#ccc', fontWeight: 700, fontSize: 14 }}>코드 에디터</span>
+          {skin && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 12, marginLeft: 4, borderLeft: '1px solid #3c3c3c' }}>
+              <span style={{ color: '#666', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>스킨</span>
+              <input
+                value={skinNameInput}
+                onChange={e => setSkinNameInput(e.target.value)}
+                onBlur={saveSkinName}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                  if (e.key === 'Escape') {
+                    setSkinNameInput(skin.name);
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
+                disabled={skinSaving}
+                title={`#${skin.id} · slug: ${skin.slug} · 클릭하여 이름 수정 (Enter 저장, Esc 취소)`}
+                placeholder="스킨 이름"
+                style={{
+                  background: '#3c3c3c',
+                  border: '1px solid #4a4a4a',
+                  borderRadius: 4,
+                  padding: '4px 8px',
+                  color: '#e0e0e0',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  outline: 'none',
+                  minWidth: 160,
+                  opacity: skinSaving ? 0.5 : 1,
+                }}
+              />
+              <span style={{ color: '#666', fontSize: 11 }}>#{skin.id}</span>
+              {skinSaving && <span style={{ color: '#888', fontSize: 11 }}>저장 중…</span>}
+            </div>
+          )}
           {activeFile && <span style={{ color: '#888', fontSize: 13 }}>{activeFile.filename}{hasChanges ? ' •' : ''}</span>}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
