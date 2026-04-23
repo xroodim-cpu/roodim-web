@@ -93,7 +93,7 @@ async function seed() {
         description: 'iFUNHA Vogue — 매거진 에디토리얼 스킨 (페이퍼 톤 + 와인 레드 액센트)',
         version: '1.0.0',
         category: 'magazine-editorial',
-        targetType: 'customer',
+        targetType: 'member',
         isDefault: false,
         isFree: true,
         status: 'active',
