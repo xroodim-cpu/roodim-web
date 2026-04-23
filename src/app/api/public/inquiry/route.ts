@@ -1,9 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sites, boards, boardPosts } from '@/drizzle/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or } from 'drizzle-orm';
 import { ensureSystemBoards } from '@/lib/board-utils';
 import { adminApi } from '@/lib/admin-api';
+
+/**
+ * body.slug 가 비어 있을 때 Host/Referer/Origin 헤더로부터 slug 를 복구.
+ *
+ * 커스텀 도메인(ondo-ad.com 등)에서 제출된 문의는 프론트가 slug 를 모를 수 있어
+ * `slug is required` 400 에러로 떨어졌다. sites.custom_domain 또는 sites.slug
+ * 로 매칭해서 자동 복구한다.
+ */
+async function resolveSlugFromHeaders(req: NextRequest): Promise<string | null> {
+  const candidates: string[] = [];
+  const referer = req.headers.get('referer');
+  const origin = req.headers.get('origin');
+  const host = req.headers.get('host');
+  for (const raw of [referer, origin, host]) {
+    if (!raw) continue;
+    try {
+      const h = raw.startsWith('http') ? new URL(raw).hostname : raw.split(':')[0];
+      if (h && !candidates.includes(h)) candidates.push(h);
+    } catch { /* ignore */ }
+  }
+  if (candidates.length === 0) return null;
+  for (const hostname of candidates) {
+    const row = await db.query.sites.findFirst({
+      where: or(eq(sites.customDomain, hostname), eq(sites.slug, hostname)),
+    });
+    if (row?.slug) return row.slug;
+    const firstSeg = hostname.split('.')[0];
+    if (firstSeg && firstSeg !== hostname) {
+      const row2 = await db.query.sites.findFirst({ where: eq(sites.slug, firstSeg) });
+      if (row2?.slug) return row2.slug;
+    }
+  }
+  return null;
+}
 
 /**
  * POST /api/public/inquiry
@@ -29,7 +63,14 @@ import { adminApi } from '@/lib/admin-api';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { slug, fields, content, mode } = body;
+    const { fields, content, mode } = body;
+    let slug: string | undefined = body.slug;
+
+    // slug 가 비어 있으면 Host/Referer/Origin 헤더로 자동 복구 (커스텀 도메인 지원)
+    if (!slug) {
+      const recovered = await resolveSlugFromHeaders(req);
+      if (recovered) slug = recovered;
+    }
 
     if (!slug) {
       return NextResponse.json({ error: 'slug is required' }, { status: 400 });
