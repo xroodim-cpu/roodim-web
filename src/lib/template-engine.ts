@@ -522,10 +522,17 @@ async function processBannerAreas(siteId: string, html: string): Promise<string>
           result = result.replace(/^(<div[^>]*?)(>)/, '$1 data-empty="1"$2');
         }
 
-        // 영역 메타 치환코드 (area row 부재 시 빈 문자열로 안전 기본)
-        result = result.replace(/\{#areaName\}/g, area[0]?.areaName || '');
-        result = result.replace(/\{#areaDesc\}/g, area[0]?.areaDesc || '');
-        result = result.replace(/\{#areaDisplayType\}/g, area[0]?.displayType || 'slide');
+        // 영역 메타 치환코드 — 루프 밖, 섹션 헤더(<h2>·<p>) 등에서 사용.
+        // snake_case (권장) + camelCase (레거시) 양쪽 지원.
+        const _areaName = area[0]?.areaName || '';
+        const _areaDesc = area[0]?.areaDesc || '';
+        const _areaDisplay = area[0]?.displayType || 'slide';
+        result = result.replace(/\{#area_name\}/g, _areaName);
+        result = result.replace(/\{#area_desc\}/g, _areaDesc);
+        result = result.replace(/\{#area_display_type\}/g, _areaDisplay);
+        result = result.replace(/\{#areaName\}/g, _areaName);
+        result = result.replace(/\{#areaDesc\}/g, _areaDesc);
+        result = result.replace(/\{#areaDisplayType\}/g, _areaDisplay);
 
         // ── 번호 기반 치환코드: {#img_1}, {#text_1} 등 ──
         // 중요: banner_loop 안에서 {#text_N} 은 "현재 배너의 texts 배열 N번째"를 의미하므로
